@@ -1,0 +1,119 @@
+# Packages
+#===========================================================
+[packages]
+host = "https://github.com/JepEtau/external_rehost/releases/download/external"
+do_cache = false
+
+
+# Windows
+#-----------------------------------------------------------
+# [packages.win32]
+# do_cache = false
+
+[packages.win32.python]
+filename = "python-3.12.10-amd64.zip"
+do_cache = true
+
+[packages.win32.ffmpeg]
+filename = "ffmpeg-release-essentials.zip"
+skip = true
+
+[packages.win32.vspython]
+filename = "vspython.zip"
+skip = true
+
+
+# Linux
+#-----------------------------------------------------------
+[packages.linux.python]
+filename = "python-3.12.10-amd64.zip"
+do_cache = true
+
+[packages.linux.ffmpeg]
+filename = "ffmpeg-2025-11-12-git-6cdd2cbe32-essentials_build_linux.zip"
+skip = true
+
+
+
+
+# Python packages
+#===========================================================
+[py_packages]
+[py_packages.common]
+pypi = [
+    "websockets",
+    "psutil",
+    "opencv-python",
+    "numpy",
+    "nvidia-ml-py",
+    "timm",
+    "onnx",
+    "onnxruntime",
+    "safetensors",
+    "hytils",
+    "hsys",
+    "backend",
+    "pynnlib",
+]
+
+# Second pass
+[py_packages.delayed]
+do_cache = true
+
+[py_packages.delayed.torch]
+uninstall_before = true
+
+# PyTorch
+[py_packages.delayed.torch.cuda]
+extra-index-url = "https://download.pytorch.org/whl/cu130"
+torch = "2.9.0+cu130"
+torchvision = "0.24.0+cu130"
+
+[py_packages.delayed.torch.cpu]
+extra-index-url = "https://download.pytorch.org/whl/cpu"
+torch = "2.9.0+cpu"
+torchvision = "0.24.0+cpu"
+
+[py_packages.delayed.torch.rocm]
+extra-index-url = "https://download.pytorch.org/whl/rocm6.4"
+torch = "2.9.0+rocm"
+torchvision = "0.24.0+rocm"
+
+# Nvidia TensorRT
+[py_packages.delayed.tensorrt]
+extra-index-url = "https://py_packages.nvidia.com"
+tensorrt = "10.14.1.48.post1"
+# 'tensorrt_cu13_libs': (),
+# 'tensorrt_cu13_bindings': (),
+# 'tensorrt_cu13': (),
+# 'tensorrt': (),
+
+
+# DirectML
+[py_packages.delayed.directml]
+directml = "onnxruntime-directml"
+
+
+
+# Other
+#===========================================================
+[packages.names]
+ffmpeg = "FFmpeg"
+vspython = "VS python"
+avs = "AviSynth+ plugins"
+
+[py_packages.names]
+opencv-python = "OpenCV"
+numpy = "NumPy"
+nvidia-ml-py = "pyNVML"
+timm = "TIMM"
+onnx = "ONNX"
+onnxruntime = "ONNX Runtime"
+safetensors = "SafeTensors"
+tensorrt = "TensorRT"
+directml = "Direct ML"
+torch = "PyTorch"
+torch-cuda = "PyTorch (CUDA)"
+torch-cpu = "PyTorch (CPU)"
+torch-rocm = "PyTorch (ROCm)"
+torchvision = "TorchVision"

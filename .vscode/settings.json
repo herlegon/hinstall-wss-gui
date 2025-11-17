@@ -1,0 +1,45 @@
+{
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.engine": true,
+        "**/*.exe": true,
+        "**/*.mkv": true,
+        "**/*.mov": true,
+        "**/*.mp4": true,
+        "**/*.mxf": true,
+        "**/*.png": true,
+        "**/*.so": true,
+        "**/*.ui": false,
+
+        "**/*.pth": true,
+        "**/*.safetensors": true,
+        "**/*.onnx": true,
+        "**/*.trtzip": true,
+        "**/*.bin": true,
+        "**/*.param": true,
+
+        "**/~$$*": true,
+        "**/external": true,
+        "**/resources": true
+    },
+    "files.insertFinalNewline": true,
+    "[python]": {
+        "editor.rulers": [
+            90,
+            120
+        ]
+    },
+    "python.analysis.extraPaths": [
+        "../pynnlib",
+        "../hytils",
+        "../hwidgets",
+    ],
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportAssignmentType": "none",
+        "reportArgumentType": "none",
+        "reportOptionalMemberAccess": "none",
+        "reportCallIssue": "none",
+        "reportAttributeAccessIssue": "none",
+    }
+}
