@@ -20,7 +20,11 @@ if __name__ == "__main__":
     import signal
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-    with open(Path("packages.toml"), "rb") as f:
+    tool = "hconvert"
+
+    config_fp = (Path(__file__).parent / "configs" / f"{tool}.toml").resolve()
+    print(f"loading config: {config_fp}")
+    with open(config_fp, "rb") as f:
         data: dict[str, Any] = tomllib.load(f)
 
     # load package toml cfg

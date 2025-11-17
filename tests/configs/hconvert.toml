@@ -15,8 +15,9 @@ filename = "python-3.12.10-win-x86_64.tar.gz"
 do_cache = true
 
 [packages.win32.ffmpeg]
-filename = "ffmpeg-release-essentials.zip"
-skip = true
+host = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-11-17-12-57/"
+filename = "ffmpeg-N-121789-gddf443f1e9-win64-lgpl.zip"
+do_cache = true
 
 [packages.win32.vspython]
 filename = "vspython.zip"
@@ -30,10 +31,9 @@ filename = "python-3.12.12-linux-x86_64.tar.gz"
 do_cache = true
 
 [packages.linux.ffmpeg]
-filename = "ffmpeg-2025-11-12-git-6cdd2cbe32-essentials_build_linux.zip"
-skip = true
-
-
+host = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-11-17-12-57/"
+filename = "ffmpeg-N-121789-gddf443f1e9-linux64-lgpl.tar.xz"
+do_cache = true
 
 
 # Python packages

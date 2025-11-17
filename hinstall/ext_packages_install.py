@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 import shutil
 from rich.progress import (
     BarColumn,
@@ -28,20 +29,52 @@ def install_ext_package(package: ExtPackage) -> bool:
     extension: str = get_extension(str(package.cache_file))
     if install_dir.exists():
         shutil.rmtree(install_dir)
+    install_dir.mkdir(parents=True, exist_ok=True)
 
     if extension == '.gz' and str(package.cache_file).endswith('.tar.gz'):
         import tarfile
-        install_dir.mkdir(parents=True, exist_ok=True)
         with tarfile.open(package.cache_file, "r:gz") as tar:
             tar.extractall(path=install_dir)
 
     elif extension == '.zip':
         import zipfile
-        with zipfile.ZipFile(package.cache_file, "r") as f:
-            f.extractall(install_dir)
+        with zipfile.ZipFile(package.cache_file, "r") as zip_file:
+            # Get all file paths in the zip
+            all_files = zip_file.namelist()
+
+            # Check if there's a single root folder
+            root_folders = set()
+            for file in all_files:
+                parts = Path(file).parts
+                if parts:
+                    root_folders.add(parts[0])
+
+            # If there's exactly one root folder and all files are under it
+            has_single_root = len(root_folders) == 1
+            if has_single_root:
+                root_folder = root_folders.pop()
+                # Extract each file, stripping the root folder from the path
+                for file in all_files:
+                    # Skip the root folder itself
+                    if file == root_folder or file == root_folder + '/':
+                        continue
+
+                    # Remove root folder from path
+                    new_path = Path(file).relative_to(root_folder)
+                    target_path = install_dir / new_path
+
+                    # Create directories if needed
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    # Write the file (skip if it's a directory)
+                    if not file.endswith('/'):
+                        source = zip_file.open(file)
+                        target_path.write_bytes(source.read())
+            else:
+                # No single root folder, extract normally
+                zip_file.extractall(install_dir)
 
     else:
-        install_dir.mkdir(parents=True, exist_ok=True)
         shutil.move(package.cache_file, install_dir)
 
     (install_dir / package.tag).touch()
