@@ -34,7 +34,7 @@ def get_backend_dirs(
         # Linux: Use XDG Base Directory
         base = Path(os.environ.get('XDG_DATA_HOME', Path.home() / ".local" / "share"))
         cache_dir = Path(os.environ.get('XDG_DATA_HOME', Path.home() / company / "cache"))
-        python_exe = "python"
+        python_exe = Path("bin") / "python"
 
     elif sys.platform == "darwin":
         # macOS: Use Application Support
@@ -53,20 +53,4 @@ def get_backend_dirs(
         models=base / company / "models",
     )
 g_backend_dirs: BackendDirectories = get_backend_dirs()
-
-
-
-def get_rehost_dir(company: str = "herlegon") -> Path:
-    local_package_dir: Path
-
-    if sys.platform == "win32":
-        local_package_dir = Path("A:\\") / company / "rehost"
-
-    elif sys.platform == "linux":
-        local_package_dir = Path("/opt") / company / "rehost"
-
-    elif sys.platform == "darwin":
-        local_package_dir = Path.home() / company / "rehost"
-
-    return local_package_dir
 

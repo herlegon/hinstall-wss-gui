@@ -174,6 +174,20 @@ class PyPackages(list):
         return result
 
 
+    def get_pypi_variant_names(self) -> list[str]:
+        """Get a list of all package names."""
+        names: list[str] = []
+        for pkg in self:
+            pkg: PyPackage
+            names.append(
+                f"{pkg.name}-{pkg.variant}" if pkg.variant else pkg.name
+            )
+        return names
+
+
+    def get_by_variant(self, variant: Literal['cpu', 'cuda', 'rocm']) -> list[PyPackage]:
+        return [pkg for pkg in self if pkg.variant == variant]
+
 
     def get_installed(self) -> 'PyPackages':
         """Get all installed packages."""
@@ -216,34 +230,3 @@ class PyPackages(list):
             if all(getattr(pkg, key, None) == value for key, value in kwargs.items()):
                 result.append(pkg)
         return result
-
-
-    def get_pypi_variant_names(self) -> list[str]:
-        """Get a list of all package names."""
-        names: list[str] = []
-        for pkg in self:
-            pkg: PyPackage
-            names.append(
-                f"{pkg.name}-{pkg.variant}" if pkg.variant else pkg.name
-            )
-        return names
-
-
-    def get_by_variant(self, variant: Literal['cpu', 'cuda', 'rocm']) -> list[PyPackage]:
-        return [pkg for pkg in self if pkg.variant == variant]
-
-
-    def print_summary(self):
-        """Print a summary of the packages."""
-        print(f"Total packages: {len(self)}")
-        print(f"Standard packages: {len(self.get_standard())}")
-        print(f"Delayed packages: {len(self.get_delayed())}")
-        print(f"Installed: {len(self.get_installed())}")
-        print(f"Not installed: {len(self.get_not_installed())}")
-        if self.get_outdated():
-            print(f"Outdated: {len(self.get_outdated())}")
-
-
-
-
-

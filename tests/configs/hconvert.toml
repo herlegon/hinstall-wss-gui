@@ -11,7 +11,7 @@ do_cache = false
 # do_cache = false
 
 [packages.win32.python]
-filename = "python-3.12.10-amd64.zip"
+filename = "python-3.12.10-win-x86_64.tar.gz"
 do_cache = true
 
 [packages.win32.ffmpeg]
@@ -26,7 +26,7 @@ skip = true
 # Linux
 #-----------------------------------------------------------
 [packages.linux.python]
-filename = "python-3.12.10-amd64.zip"
+filename = "python-3.12.12-linux-x86_64.tar.gz"
 do_cache = true
 
 [packages.linux.ffmpeg]

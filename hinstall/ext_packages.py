@@ -1,11 +1,11 @@
 
 from dataclasses import dataclass
-from logger import ilog
 from pathlib import Path
 import requests
 import sys
-from typing import Any, Literal
-from backend_dirs import g_backend_dirs
+from typing import Any
+from .backend_dirs import g_backend_dirs
+from .logger import ilog
 
 
 PACKAGES: tuple[str] = (

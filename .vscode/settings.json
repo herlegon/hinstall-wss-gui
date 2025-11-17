@@ -1,26 +1,16 @@
 {
     "files.exclude": {
         "**/__pycache__": true,
-        "**/*.engine": true,
         "**/*.exe": true,
-        "**/*.mkv": true,
-        "**/*.mov": true,
-        "**/*.mp4": true,
-        "**/*.mxf": true,
         "**/*.png": true,
         "**/*.so": true,
         "**/*.ui": false,
 
-        "**/*.pth": true,
-        "**/*.safetensors": true,
-        "**/*.onnx": true,
-        "**/*.trtzip": true,
-        "**/*.bin": true,
-        "**/*.param": true,
-
         "**/~$$*": true,
         "**/external": true,
-        "**/resources": true
+        "**/resources": true,
+        "**/dist": true,
+        "**/*.egg-info": true,
     },
     "files.insertFinalNewline": true,
     "[python]": {

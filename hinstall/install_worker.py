@@ -10,9 +10,9 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 from PySide6.QtCore import QThread, Signal
 
-from utils import (
+from .backend_dirs import (
     BackendDirectories,
-    get_python_version,
+    # get_python_version,
 )
 
 

@@ -10,11 +10,14 @@ import tempfile
 from hytils import (
     reformat_datetime,
 )
-from backend_dirs import g_backend_dirs
-from utils import check_site_reachable, get_domain_from_url
-from logger import ilog
 from urllib.error import URLError, HTTPError
-from ext_packages import ExtPackage
+from .backend_dirs import g_backend_dirs
+from .ext_packages import ExtPackage
+from .logger import ilog
+from .utils import (
+    check_site_reachable,
+    get_domain_from_url,
+)
 
 
 

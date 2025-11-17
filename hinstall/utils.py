@@ -34,21 +34,3 @@ def check_site_reachable(url: str, max_retries: int = 3):
     return False
 
 
-
-if __name__ == "__main__":
-    import signal
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-    from logger import ilog
-    ilog.setLevel("DEBUG")
-
-    urls = [
-        "https://www.github.com",
-        "https://github.com/JepEtau/external_rehost/releases/download/external",
-    ]
-    for url in urls:
-        domain = get_domain_from_url(url)
-        reachable = check_site_reachable(url=domain)
-        if not reachable:
-            ilog.error(f"{domain} is not reachable")
-        else:
-            ilog.info(f"{domain} is alive")

@@ -1,9 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from pprint import pprint
-import sys
-import tomllib
-from typing import Any
 import shutil
 from rich.progress import (
     BarColumn,
@@ -15,30 +10,32 @@ from rich.progress import (
 )
 from hytils import (
     get_extension,
-    lightcyan,
-    lightgreen,
     red,
 )
-from ext_package_dl import (
+from .ext_packages import ExtPackage
+from .ext_packages_dl import (
     clean_cache,
     download_package_,
 )
-from install.parse_package_config import parse_packages_toml_
-from backend_dirs import g_backend_dirs, get_rehost_dir
-from logger import ilog
-from ext_packages import ExtPackage, ExtPackages
+from .logger import ilog
 
 
 
 def install_ext_package(package: ExtPackage) -> bool:
-    ilog.debug(f"Install: {package.name}")
     install_dir = package.install_dir
+    ilog.debug(f"Install: {package.name} in {install_dir}")
 
     extension: str = get_extension(str(package.cache_file))
     if install_dir.exists():
         shutil.rmtree(install_dir)
 
-    if extension == '.zip':
+    if extension == '.gz' and str(package.cache_file).endswith('.tar.gz'):
+        import tarfile
+        install_dir.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(package.cache_file, "r:gz") as tar:
+            tar.extractall(path=install_dir)
+
+    elif extension == '.zip':
         import zipfile
         with zipfile.ZipFile(package.cache_file, "r") as f:
             f.extractall(install_dir)
@@ -85,7 +82,7 @@ def dl_and_install_ext_package(
     if package.installed:
         ilog.info(f"{package.name}: installed")
     else:
-        ilog.error(f"{package.name}: Failed to install")
+        ilog.error(f"{package.name}: failed to install")
 
     return package.installed
 
@@ -155,63 +152,4 @@ def download_install_ext_packages(
     return True
 
 
-
-
-if __name__ == "__main__":
-    import signal
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-    import sys
-    from logger import ilog
-    ilog.setLevel("DEBUG")
-
-    with open(Path("packages.toml"), "rb") as f:
-        data: dict[str, Any] = tomllib.load(f)
-
-    packages_cfg = parse_packages_toml_(data)
-    pprint(packages_cfg)
-
-    external_packages = ExtPackages(packages_cfg, sys.platform)
-    external_packages.get_all_except('python')
-    print(lightcyan(" ".join (("-" * 40, sys.platform, "-" * 40))))
-    pprint(external_packages)
-    print()
-
-    python_package = external_packages.get_by_key('python')
-    print(lightcyan(" ".join (("-" * 40, "python", "-" * 40))))
-    pprint(python_package)
-    print()
-
-    g_backend_dirs.local_host = get_rehost_dir()
-    print(lightcyan(" ".join (("-" * 40, "backend directories", "-" * 40))))
-    pprint(g_backend_dirs)
-
-
-    if python_package:
-        installed: bool = download_install_ext_packages(
-            packages=python_package,
-            reinstall=True,
-            threads=1,
-            use_local_host=True
-        )
-        if installed:
-            print(lightgreen("All packages installed"))
-        else:
-            print(red("Error: missing package(s)"))
-    else:
-        print(lightgreen("No packages to install"))
-
-
-    if external_packages:
-        installed: bool = download_install_ext_packages(
-            packages=external_packages,
-            reinstall=True,
-            threads=1,
-            use_local_host=True
-        )
-        if installed:
-            print(lightgreen("All packages installed"))
-        else:
-            print(red("Error: missing package(s)"))
-    else:
-        print(lightgreen("No packages to install"))
 
