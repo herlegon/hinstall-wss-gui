@@ -43,6 +43,31 @@ def clean_cache(package: ExtPackage) -> None:
 
 
 
+class ProgressWrapper:
+    def __init__(self, raw_response, progress, task_id, update_threshold=512*1024):
+        self.raw = raw_response
+        self.progress = progress
+        self.task_id = task_id
+        self.update_threshold = update_threshold
+        self.bytes_downloaded = 0
+
+    def read(self, size=-1):
+        data = self.raw.read(size)
+        if data and self.progress is not None:
+            self.bytes_downloaded += len(data)
+            if self.bytes_downloaded >= self.update_threshold:
+                self.progress.update(self.task_id, advance=self.bytes_downloaded)
+                self.bytes_downloaded = 0
+        return data
+
+    def flush_progress(self):
+        """Call this after download completes to update remaining bytes"""
+        if self.progress is not None and self.bytes_downloaded > 0:
+            self.progress.update(self.task_id, advance=self.bytes_downloaded)
+            self.bytes_downloaded = 0
+
+
+
 def download_package_from_host(
     package: ExtPackage,
     retry: int = 3,
@@ -71,14 +96,20 @@ def download_package_from_host(
 
         with open(package.cache_file, "wb") as f:
             try:
-                for data in package.response.iter_content(chunk_size=1024):
-                    f.write(data)
-                    if progress is not None:
-                        progress.update(task_id, advance=len(data))
+                package.response.raw.decode_content = True
+                wrapper = ProgressWrapper(
+                    package.response.raw,
+                    progress,
+                    task_id,
+                    update_threshold=512*1024  # Update every 512KB
+                )
+
+                shutil.copyfileobj(wrapper, f, length=256*1024)  # 256KB buffer
+                wrapper.flush_progress()  # Update any remaining bytes
+
             except Exception as e:
-                ilog.debug("[W] Retry download, error: type(e)")
+                ilog.debug(f"[W] Retry download, error: {type(e)}")
                 _retry -= 1
-                continue
 
         if _retry == 0:
             ilog.debug(f"[E] failed downloading {package.filename}")
