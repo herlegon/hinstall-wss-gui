@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from hytils import lightcyan, lightgreen, orange, red, get_org_tempdir
 from importlib import metadata
 import os
 from pathlib import Path
@@ -19,16 +20,28 @@ from rich.progress import (
     TransferSpeedColumn,
 )
 
-
 from .ext_packages import ExtPackage
-from hytils import lightcyan, lightgreen, orange, red, get_org_tempdir
 
 from .py_packages import PyPackage
 from .logger import ilog
 from .backend_dirs import g_backend_dirs
 
 
-def get_backend_env(exclude: list[str] | None = None) -> dict:
+
+g_backend_env = None
+def generate_backend_env(exclude: list[str] | None = None) -> bool:
+    global g_backend_env
+    try:
+        g_backend_env = _generate_backend_env(exclude=exclude)
+    except Exception as e:
+        ilog.critical(f"Failed to define the backend environment: {str(e)}")
+        return False
+
+    return True
+
+
+
+def _generate_backend_env(exclude: list[str] | None = None) -> dict:
     # Environnment
     # ilog.info(f"Local environment:")
     # ilog.info(get_python_env())
@@ -124,8 +137,6 @@ def get_backend_env(exclude: list[str] | None = None) -> dict:
 
     return backend_env
 
-
-g_backend_env = get_backend_env()
 
 
 

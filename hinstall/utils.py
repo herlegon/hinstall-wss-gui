@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+from pprint import pprint
 from tarfile import TarFile, TarInfo
 from zipfile import ZipFile
 from rich.progress import (
@@ -148,54 +150,60 @@ def extract_tar_file(
         """Check if any part of the path matches excluded names"""
         return any(part in exclude for part in path.parts) or path.name in exclude
 
-    # start_time = time.time()
-    # Single pass: collect members, detect root, calculate size
-    all_members: list[TarInfo] = []
-    root_folders = set()
-    total_bytes: int = 0
+    members = compressed_data.getmembers()
+    file_members = [m for m in members
+                    if m.isfile() or m.issym() or m.islnk()]
+    total_files = len(file_members)
 
-    for member in compressed_data:  # Iterator - same as getmembers() but cleaner
-        all_members.append(member)
-
-        if member.isfile():
-            total_bytes += member.size
-
-        parts = Path(member.name).parts
-        if parts:
-            root_folders.add(parts[0])
-
+    # detect single root folder
+    root_folders = {Path(m.name).parts[0] for m in members if Path(m.name).parts}
     has_single_root = len(root_folders) == 1
-    root_folder = root_folders.pop() if has_single_root else None
+    root_folder = next(iter(root_folders)) if has_single_root else None
 
-    if progress is not None and task_id is not None:
-        progress.update(task_id, total=total_bytes)
-    # print(f"elapsed: {time.time() - start_time:.1f}")
+    if progress and task_id:
+        progress.update(task_id, total=total_files)
 
     # Extract files
-    for member in all_members:
-        if not member.isfile():
-            continue
-
+    extracted_count = 0
+    for member in file_members:
         file_path = Path(member.name)
 
-        # Handle single root folder
-        if has_single_root and root_folder is not None:
-            if member.name == root_folder or member.name == f'{root_folder}/':
-                continue
-            file_path = file_path.relative_to(root_folder)
+        # handle single root folder
+        if has_single_root and root_folder:
+            if file_path.parts[0] == root_folder:
+                file_path = file_path.relative_to(root_folder)
 
+        # skip excluded
         if should_exclude(file_path):
-            if progress is not None and task_id is not None:
-                progress.update(task_id, advance=member.size)
+            if progress and task_id:
+                progress.update(task_id, advance=1)
             continue
 
         target_path = install_dir / file_path
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
-        source = compressed_data.extractfile(member)
-        if source:
-            target_path.write_bytes(source.read())
+        # regular file
+        if member.isfile():
+            source = compressed_data.extractfile(member)
+            if source:
+                target_path.write_bytes(source.read())
+            os.chmod(target_path, member.mode)
 
-        if progress is not None and task_id is not None:
-            progress.update(task_id, advance=member.size)
+        # symbolic link
+        elif member.issym():
+            if target_path.exists() or target_path.is_symlink():
+                target_path.unlink()
+            target_path.symlink_to(member.linkname)
+
+        # hard link
+        elif member.islnk():
+            link_target = Path(member.linkname)
+            if has_single_root and root_folder and link_target.parts[0] == root_folder:
+                link_target = link_target.relative_to(root_folder)
+            target_path.hardlink_to(install_dir / link_target)
+
+        # update progress
+        if progress and task_id:
+            extracted_count += 1
+            progress.update(task_id, advance=1)
 

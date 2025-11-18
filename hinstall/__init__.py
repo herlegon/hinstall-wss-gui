@@ -27,7 +27,7 @@ from .py_packages import (
 
 from .py_packages_install import (
     get_python_version,
-    get_backend_env,
+    generate_backend_env,
     g_backend_env,
 )
 
@@ -44,7 +44,7 @@ __all__ = [
     "PyPackage",
     "PyPackages",
     "get_python_version",
-    "get_backend_env",
+    "generate_backend_env",
     "g_backend_env",
 
 

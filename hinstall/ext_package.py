@@ -1,6 +1,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from pprint import pprint
 import tempfile
 from hytils import get_extension, reformat_datetime
 from pathlib import Path
@@ -11,7 +12,13 @@ from rich.progress import Progress, TaskID
 from urllib.error import URLError
 
 from .backend_dirs import g_backend_dirs
-from .utils import ProgressWrapper, check_site_reachable, extract_tar_file, extract_zip_file, get_domain_from_url
+from .utils import (
+    ProgressWrapper,
+    check_site_reachable,
+    extract_tar_file,
+    extract_zip_file,
+    get_domain_from_url,
+)
 from .logger import ilog
 
 
@@ -47,7 +54,10 @@ class ExtPackage:
 
     def __post_init__(self):
         self.skip = bool(self.filename == '')
-
+        if self.do_cache:
+            self.cache_file = g_backend_dirs.cache / self.filename
+        else:
+            self.cache_file = Path(tempfile.gettempdir()) / "herlegon" / self.filename
 
     @property
     def retry_count(self) -> int:
@@ -80,6 +90,7 @@ class ExtPackage:
     def update_tag(self) -> None:
         last_modified: str = ""
         self.downloadable: bool = False
+        self._update_cache_file()
 
         if self.use_local_host:
             local_host = g_backend_dirs.local_host
@@ -119,15 +130,17 @@ class ExtPackage:
                     except requests.exceptions.RequestException as e:
                         if str(e).startswith('404'):
                             ilog.error(f"{self.filename} not found on the host")
+                            response = None
                             break
                         else:
                             ilog.error(f"Exception while fetching: {str(e)}")
                         if attempt < self.retry_count - 1:
                             continue
 
-                    self.downloadable = True
-                    last_modified: str = reformat_datetime(response.headers['Last-Modified'])
-                    self.size = int(response.headers.get('Content-length', 0))
+                    if response:
+                        self.downloadable = True
+                        last_modified: str = reformat_datetime(response.headers['Last-Modified'])
+                        self.size = int(response.headers.get('Content-length', 0))
                     self.response = response
 
         self.tag = (

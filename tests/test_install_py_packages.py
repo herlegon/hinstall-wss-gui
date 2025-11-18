@@ -15,7 +15,7 @@ from hinstall import (
     PyPackages,
     g_backend_dirs,
     download_install_ext_packages,
-    get_backend_env,
+    generate_backend_env,
     g_backend_env,
     get_python_version,
     ilog,
@@ -37,38 +37,31 @@ if __name__ == "__main__":
     # Install python if not yest installed
     python_package = ExtPackages(packages_cfg, sys.platform).get_by_key('python')
     pprint(python_package)
+
+    # Use local rehost
+    g_backend_dirs.local_host = get_rehost_dir()
+    python_package.use_local_host = True
+
     if not python_package.is_installed():
-        ilog.error("Python is not installed")
+        ilog.error(f"{python_package.name} is not installed. Installing...")
         installed: bool = download_install_ext_packages(
             packages=python_package,
             reinstall=False,
-            threads=1,
             use_local_host=True
         )
         if not python_package.installed:
-            ilog.error("Error: python not installed")
+            ilog.error(f"Error: {python_package.name} not installed")
             sys.exit(-1)
+    else:
+        ilog.info(f"{python_package.name} is installed.")
+
+    generate_backend_env()
 
 
     py_packages = PyPackages(packages_cfg, sys.platform)
     py_packages = py_packages.get_initial()
     pprint(py_packages)
 
-
-
-    if python_package:
-        installed: bool = download_install_ext_packages(
-            packages=python_package,
-            reinstall=False,
-            threads=1,
-            use_local_host=True
-        )
-        if installed:
-            print(lightgreen("Python package installed"))
-        else:
-            print(red("Error: python not installed"))
-    else:
-        print(red("Error: no package to install"))
 
 
 

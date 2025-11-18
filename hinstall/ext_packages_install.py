@@ -1,10 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-from pprint import pprint
-from hytils import (
-    get_extension,
-    red,
-)
-from pathlib import Path
 from rich.progress import (
     BarColumn,
     DownloadColumn,
@@ -13,16 +7,9 @@ from rich.progress import (
     TimeRemainingColumn,
     TransferSpeedColumn,
 )
-import shutil
-import tempfile
-
 from .backend_dirs import g_backend_dirs
 from .ext_package import ExtPackage
 from .logger import ilog
-from .utils import (
-    extract_tar_file,
-    extract_zip_file,
-)
 
 
 
@@ -117,7 +104,6 @@ def download_install_ext_packages(
             else []
         )
 
-    ilog.info(f"use local host: {use_local_host}")
     for pkg in packages:
         pkg.use_local_host = use_local_host
         pkg.retry_count = retry

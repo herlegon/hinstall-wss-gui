@@ -40,7 +40,7 @@ if __name__ == "__main__":
     if python_package:
         installed: bool = download_install_ext_packages(
             packages=python_package,
-            reinstall=False,
+            reinstall=True,
             threads=1,
             use_local_host=True
         )

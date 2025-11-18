@@ -10,7 +10,7 @@ from hinstall import (
     PyPackages,
     g_backend_dirs,
     download_install_ext_packages,
-    get_backend_env,
+    generate_backend_env,
     g_backend_env
 )
 
@@ -39,7 +39,7 @@ from hinstall import (
     #     print(f"Error launching terminal: {e}")
 
 if __name__ == "__main__":
-    new_env = get_backend_env()
+    new_env = generate_backend_env()
 
     # 1. Determine the shell and arguments
     if sys.platform == "win32":
