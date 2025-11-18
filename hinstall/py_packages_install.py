@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import json
 from hytils import lightcyan, lightgreen, orange, red, get_org_tempdir
 from importlib import metadata
 import os
@@ -37,6 +38,7 @@ def generate_backend_env(exclude: list[str] | None = None) -> dict | None:
         if backend_env is None:
             ilog.critical("Backend env generation returned None (unexpected).")
             return None
+        g_backend_env = backend_env
         return backend_env
 
     except Exception as e:
@@ -90,7 +92,7 @@ def _generate_backend_env(exclude: list[str] | None = None) -> dict:
                     continue
                 try:
                     del backend_env[k]
-                    ilog.debug(f"Removed: {k} = {v}")
+                    # ilog.debug(f"Removed: {k} = {v}")
                 except KeyError as e:
                     ilog.debug(f"failed to remove {k}: {str(e)}")
 
@@ -114,7 +116,7 @@ def _generate_backend_env(exclude: list[str] | None = None) -> dict:
         is_forbidden = False
         for n in forbidden_names:
             if n in entry_lower:
-                ilog.debug(f"Removed path entry: {entry} (contains '{n}')")
+                # ilog.debug(f"Removed path entry: {entry} (contains '{n}')")
                 is_forbidden = True
                 break
 
@@ -153,9 +155,10 @@ def _generate_backend_env(exclude: list[str] | None = None) -> dict:
 def get_python_version() -> str:
     # Run the python executable with the '-V' or '--version' flag to get the version
     version: str = ""
+    python_exe = str(g_backend_dirs.python_exe)
     try:
         result = subprocess.run(
-            [str(g_backend_dirs.python_exe), '--version'],
+            [python_exe, '--version'],
             capture_output=True,
             text=True,
             env=g_backend_env
@@ -171,23 +174,81 @@ def update_pip() -> bool:
     python_exe = str(g_backend_dirs.python_exe)
     pip_command: str = f"{python_exe} -m pip install --upgrade pip"
     try:
-        subprocess.run(
+        result = subprocess.run(
             pip_command.split(' '),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             timeout=10,
             check=True,
+            text=True,
             env=g_backend_env,
         )
+
     except subprocess.CalledProcessError as e:
         # Specific error if subprocess fails
-        ilog.error(f"Error occurred while updating pip: {e}")
+        ilog.error(f"Error occurred while updating pip: {str(e)}")
         return False
+
     except Exception as e:
         # Catch all other unexpected errors
-        ilog.error(f"Unexpected error: {e}")
+        ilog.error(f"Unexpected error: {str(e)}")
         return False
+
+    ilog.debug(result.stdout.strip())
     return True
+
+
+def get_pypackage_list() -> str:
+    python_exe = str(g_backend_dirs.python_exe)
+    pip_command: str = f"{python_exe} -m pip list"
+    try:
+        result = subprocess.run(
+            pip_command.split(' '),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=10,
+            check=True,
+            text=True,
+            env=g_backend_env,
+        )
+
+    except subprocess.CalledProcessError as e:
+        # Specific error if subprocess fails
+        ilog.error(f"Error occurred while updating pip: {str(e)}")
+        return ""
+
+    except Exception as e:
+        # Catch all other unexpected errors
+        ilog.error(f"Unexpected error: {str(e)}")
+        return ""
+
+    ilog.debug(result.stdout.strip())
+    return result.stdout.strip()
+
+
+def get_pip_versions() -> str:
+    python_exe = str(g_backend_dirs.python_exe)
+    embedded_script = (Path(__file__).parent / "get_versions.py").resolve()
+    try:
+        result = subprocess.run(
+            [python_exe, str(embedded_script)],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        packages = json.loads(result.stdout)
+
+    except subprocess.CalledProcessError as e:
+        # Specific error if subprocess fails
+        ilog.error(f"Error occurred while updating pip: {str(e)}")
+        return ""
+
+    except Exception as e:
+        # Catch all other unexpected errors
+        ilog.error(f"Unexpected error: {str(e)}")
+        return ""
+
+    return packages
 
 
 
@@ -306,13 +367,18 @@ def uninstall_py_package(package: PyPackage) -> bool:
     ilog.debug(f"uninstall {package.name}")
     pip_command: str = f"python -m pip uninstall -y {package.name}"
     try:
-        subprocess.run(
+        result = subprocess.run(
             pip_command.split(' '),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-    except:
+
+    except Exception as e:
+        # Catch all other unexpected errors
+        ilog.error(f"Unexpected error: {str(e)}")
         return False
+
+    ilog.debug(result.stdout.strip())
     return True
 
 

@@ -5,6 +5,7 @@ import sys
 import tomllib
 from typing import Any
 
+from hinstall.py_packages_install import get_pip_versions, get_pypackage_list, update_package_info, update_pip
 from hytils import lightcyan, lightgreen, red
 from local_rehost import get_rehost_dir
 
@@ -16,7 +17,6 @@ from hinstall import (
     g_backend_dirs,
     download_install_ext_packages,
     generate_backend_env,
-    g_backend_env,
     get_python_version,
     ilog,
 )
@@ -55,25 +55,22 @@ if __name__ == "__main__":
     else:
         ilog.info(f"{python_package.name} is installed.")
 
-    generate_backend_env()
+    backend_env = generate_backend_env()
 
 
     py_packages = PyPackages(packages_cfg, sys.platform)
     py_packages = py_packages.get_initial()
     pprint(py_packages)
 
-
-
-
-    # Use backend python
     print(get_python_version())
 
-    # get_standalone_env()
-    # success: bool = update_pip(python_exe)
-    # if success:
-    #     logger.info("[I] pip is up-to-date")
-    # else:
-    #     logger.warning("[W] Failed updating pip")
+
+    get_pypackage_list()
+
+    # update_package_info(py_packages[0])
+
+    installed_versions = get_pip_versions()
+    pprint(installed_versions)
 
     # install_py_packages(
     #     python_exe=python_exe,
