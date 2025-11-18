@@ -12,7 +12,7 @@ class BackendDirectories:
     external: Path
     cache: Path
     models: Path
-    local_host: Path | None = None
+    local_host: Path = None
 
 
 

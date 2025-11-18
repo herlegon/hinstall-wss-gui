@@ -2,19 +2,15 @@ __version__ = "0.1.0"
 
 from .logger import ilog
 
+from .backend_dirs import g_backend_dirs
+
 from .utils import (
     get_domain_from_url,
     check_site_reachable,
 )
 
-from .backend_dirs import (
-    g_backend_dirs,
-)
-
-from .ext_packages import (
-    ExtPackage,
-    ExtPackages,
-)
+from .ext_package import ExtPackage
+from .ext_packages import ExtPackages
 
 from .ext_packages_install import (
     download_install_ext_packages,
@@ -29,6 +25,11 @@ from .py_packages import (
     PyPackages,
 )
 
+from .py_packages_install import (
+    get_python_version,
+    get_backend_env,
+    g_backend_env,
+)
 
 __all__ = [
     "ilog",
@@ -42,6 +43,10 @@ __all__ = [
 
     "PyPackage",
     "PyPackages",
+    "get_python_version",
+    "get_backend_env",
+    "g_backend_env",
+
 
     "get_domain_from_url",
     "check_site_reachable",

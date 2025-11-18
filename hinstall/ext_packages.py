@@ -1,10 +1,10 @@
 
-from dataclasses import dataclass
 from pathlib import Path
-import requests
 import sys
 from typing import Any
+
 from .backend_dirs import g_backend_dirs
+from .ext_package import ExtPackage
 from .logger import ilog
 
 
@@ -13,34 +13,6 @@ PACKAGES: tuple[str] = (
     'vspython',
     'avs',
 )
-
-
-@dataclass
-class ExtPackage:
-    name: str
-    filename: str
-    key: str
-
-    # Installation, skip is not necessary except for dev and to keep the
-    # definitions in the config file
-    skip: bool
-    install_dir: Path = None
-    installed: bool = False
-
-    # Where to download from
-    tag: Path = None
-    size: int = 0
-    host: str = ''
-    response: requests.Response | None = None
-
-    # Downloaded/cached
-    downloaded: bool = False
-    cache_file: Path = None
-    do_cache: bool = False
-
-    def __post_init__(self):
-        self.skip = bool(self.filename == '')
-
 
 
 class ExtPackages(list):
@@ -120,14 +92,14 @@ class ExtPackages(list):
         result.extend([pkg for pkg in self if pkg.key != key])
         return result
 
+    # Doesn't reflect the reality if packages not "updated"
+    # def get_installed(self) -> 'ExtPackages':
+    #     result = ExtPackages()
+    #     result.extend([pkg for pkg in self if pkg.installed])
+    #     return result
 
-    def get_installed(self) -> 'ExtPackages':
-        result = ExtPackages()
-        result.extend([pkg for pkg in self if pkg.installed])
-        return result
 
-
-    def get_not_installed(self) -> 'ExtPackages':
-        result = ExtPackages()
-        result.extend([pkg for pkg in self if not pkg.installed])
-        return result
+    # def get_not_installed(self) -> 'ExtPackages':
+    #     result = ExtPackages()
+    #     result.extend([pkg for pkg in self if not pkg.installed])
+    #     return result

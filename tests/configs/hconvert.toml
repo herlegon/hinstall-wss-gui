@@ -40,21 +40,25 @@ do_cache = true
 #===========================================================
 [py_packages]
 [py_packages.common]
+# pypi = [
+#     "websockets",
+#     "psutil",
+#     "opencv-python",
+#     "numpy",
+#     "nvidia-ml-py",
+#     "timm",
+#     "onnx",
+#     "onnxruntime",
+#     "safetensors",
+#     "hytils",
+#     "hsys",
+#     "backend",
+#     "pynnlib",
+# ]
 pypi = [
     "websockets",
-    "psutil",
-    "opencv-python",
-    "numpy",
-    "nvidia-ml-py",
-    "timm",
-    "onnx",
-    "onnxruntime",
-    "safetensors",
-    "hytils",
-    "hsys",
-    "backend",
-    "pynnlib",
 ]
+
 
 # Second pass
 [py_packages.delayed]
