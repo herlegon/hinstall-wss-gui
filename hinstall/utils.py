@@ -1,7 +1,9 @@
 import os
 from pathlib import Path
 from pprint import pprint
+import shutil
 from tarfile import TarFile, TarInfo
+import time
 from zipfile import ZipFile
 from rich.progress import (
     Progress,
@@ -145,23 +147,24 @@ def extract_tar_file(
     progress: Progress | None = None,
     task_id=None
 ) -> None:
+    start_time = time.time()
     if True:
         _extract_tar_file_file_count(
             compressed_data,
             install_dir,
             exclude,
-            progress,
-            task_id,
+            None,
+            None,
         )
     else:
         _extract_tar_file_file_size(
             compressed_data,
             install_dir,
             exclude,
-            progress,
-            task_id,
+            None,
+            None,
         )
-
+    print(f"elapsed: {time.time() - start_time}")
 
 
 def _extract_tar_file_file_size(
@@ -317,3 +320,4 @@ def _extract_tar_file_file_count(
             extracted_count += 1
             progress.update(task_id, advance=1)
 
+    compressed_data.extractall

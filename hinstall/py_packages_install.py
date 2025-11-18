@@ -30,20 +30,20 @@ from .backend_dirs import g_backend_dirs
 
 g_backend_env = None
 
-def generate_backend_env(exclude: list[str] | None = None) -> bool:
+def generate_backend_env(exclude: list[str] | None = None) -> dict | None:
     global g_backend_env
     try:
         backend_env = _generate_backend_env(exclude=exclude)
         if backend_env is None:
             ilog.critical("Backend env generation returned None (unexpected).")
-            return False
+            return None
+        return backend_env
 
     except Exception as e:
         ilog.critical(f"Failed to define the backend environment: {str(e)}")
-        return False
+        return None
 
-    g_backend_env = backend_env
-    return True
+    return backend_env
 
 
 
@@ -57,13 +57,11 @@ def _generate_backend_env(exclude: list[str] | None = None) -> dict:
             'python',
             'conda',
             'vapoursynth',
+            'windowsapps',
+            'miniconda',
         )
     else:
-        forbidden_names: tuple[str] = (
-            'python',
-            'conda',
-            'vapoursynth',
-        )
+        forbidden_names = exclude
 
     python_dir: Path = g_backend_dirs.python_exe.parent
     if sys.platform == 'linux':
@@ -92,7 +90,7 @@ def _generate_backend_env(exclude: list[str] | None = None) -> dict:
                     continue
                 try:
                     del backend_env[k]
-                    # ilog.debug(f"Removed: {k} = {v}")
+                    ilog.debug(f"Removed: {k} = {v}")
                 except KeyError as e:
                     ilog.debug(f"failed to remove {k}: {str(e)}")
 
@@ -109,11 +107,14 @@ def _generate_backend_env(exclude: list[str] | None = None) -> dict:
     path_entries = original_path.split(sep)
     filtered_path_entries = []
     for entry in path_entries:
+        if entry == '.':
+            continue
+
         entry_lower = entry.lower()
         is_forbidden = False
         for n in forbidden_names:
             if n in entry_lower:
-                # ilog.debug(f"Removed path entry: {entry} (contains '{n}')")
+                ilog.debug(f"Removed path entry: {entry} (contains '{n}')")
                 is_forbidden = True
                 break
 
@@ -121,7 +122,10 @@ def _generate_backend_env(exclude: list[str] | None = None) -> dict:
             filtered_path_entries.append(entry)
 
     backend_env['PATH'] = sep.join(
-        [str(g_backend_dirs.python_exe.parent)] + filtered_path_entries
+        [
+            str(g_backend_dirs.python_exe.parent),
+            str(g_backend_dirs.python_exe.parent / "Scripts"),
+        ] + filtered_path_entries
     )
 
     python_exe = str(g_backend_dirs.python_exe)

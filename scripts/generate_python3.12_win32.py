@@ -126,6 +126,30 @@ def main():
         sys.exit(result.returncode)
 
 
+    # After pip installation, create wrapper batch files
+    scripts_dir = workdir / "Scripts"
+    if not scripts_dir.exists():
+        scripts_dir.mkdir()
+
+    # Create pip.bat wrapper
+    pip_bat = scripts_dir / "pip.bat"
+    pip_bat.write_text(
+        '@echo off\n'
+        '"%~dp0..\\python.exe" -m pip %*\n'
+    )
+
+    # Create pip3.bat wrapper
+    pip3_bat = scripts_dir / "pip3.bat"
+    pip3_bat.write_text(
+        '@echo off\n'
+        '"%~dp0..\\python.exe" -m pip %*\n'
+    )
+
+    # Remove the problematic .exe launchers
+    for exe in scripts_dir.glob("pip*.exe"):
+        exe.unlink()
+
+
     # Ensure site-packages visible
     print("[*] Ensuring site-packages path in ._pth file...")
     pth_file = next(workdir.glob(f"python{python_version}._pth"))
