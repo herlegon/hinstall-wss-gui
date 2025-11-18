@@ -47,7 +47,7 @@ if __name__ == "__main__":
             packages=packages_to_install,
             reinstall=True,
             threads=1,
-            use_local_host=False
+            use_local_host=True
         )
         if installed:
             print(lightgreen("All packages installed"))

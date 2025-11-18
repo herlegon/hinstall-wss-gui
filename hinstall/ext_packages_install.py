@@ -1,6 +1,10 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from pprint import pprint
 import shutil
+from tarfile import TarFile
+import time
+from zipfile import ZipFile
 from rich.progress import (
     BarColumn,
     DownloadColumn,
@@ -20,59 +24,186 @@ from .ext_packages_dl import (
 )
 from .logger import ilog
 
+def extract_zip_file(
+    compressed_data: ZipFile,
+    install_dir: Path,
+    exclude: list[str] = [],
+    progress: Progress | None = None,
+    task_id = None
+) -> None:
+    """Extract ZIP archive with progress tracking, excluding specified names"""
+
+    def should_exclude(path: Path) -> bool:
+        """Check if any part of the path matches excluded names"""
+        return any(part in exclude for part in path.parts) or path.name in exclude
+
+    all_files = compressed_data.namelist()
+
+    # Check for single root folder
+    root_folders = set()
+    for file in all_files:
+        parts = Path(file).parts
+        if parts:
+            root_folders.add(parts[0])
+
+    has_single_root = len(root_folders) == 1
+    root_folder = root_folders.pop() if has_single_root else None
+
+    # Calculate total size
+    total_bytes = sum(
+        compressed_data.getinfo(f).file_size
+        for f in all_files
+        if not f.endswith('/')
+    )
+
+    if progress is not None and task_id is not None:
+        progress.update(task_id, total=total_bytes)
+
+    # Extract files
+    for file in all_files:
+        if file.endswith('/'):
+            continue
+
+        file_path = Path(file)
+
+        # Handle single root folder
+        if has_single_root and root_folder is not None:
+            if file == root_folder or file == f'{root_folder}/':
+                continue
+            file_path = file_path.relative_to(root_folder)
+
+        file_size = compressed_data.getinfo(file).file_size
+
+        if should_exclude(file_path):
+            if progress is not None and task_id is not None:
+                progress.update(task_id, advance=file_size)
+            continue
+
+        target_path = install_dir / file_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with compressed_data.open(file) as source:
+            target_path.write_bytes(source.read())
+
+        if progress is not None and task_id is not None:
+            progress.update(task_id, advance=file_size)
 
 
-def install_ext_package(package: ExtPackage) -> bool:
+def extract_tar_file(
+    compressed_data: TarFile,
+    install_dir: Path,
+    exclude: list[str] = [],
+    progress: Progress | None = None,
+    task_id = None
+) -> None:
+    """Extract TAR archive with progress tracking, excluding specified names"""
+
+    def should_exclude(path: Path) -> bool:
+        """Check if any part of the path matches excluded names"""
+        return any(part in exclude for part in path.parts) or path.name in exclude
+
+    # start_time = time.time()
+    # Single pass: collect members, detect root, calculate size
+    all_members = []
+    root_folders = set()
+    total_bytes = 0
+
+    for member in compressed_data:  # Iterator - same as getmembers() but cleaner
+        all_members.append(member)
+
+        if member.isfile():
+            total_bytes += member.size
+
+        parts = Path(member.name).parts
+        if parts:
+            root_folders.add(parts[0])
+
+    has_single_root = len(root_folders) == 1
+    root_folder = root_folders.pop() if has_single_root else None
+
+    if progress is not None and task_id is not None:
+        progress.update(task_id, total=total_bytes)
+    # print(f"elapsed: {time.time() - start_time:.1f}")
+
+    # Extract files
+    for member in all_members:
+        if not member.isfile():
+            continue
+
+        file_path = Path(member.name)
+
+        # Handle single root folder
+        if has_single_root and root_folder is not None:
+            if member.name == root_folder or member.name == f'{root_folder}/':
+                continue
+            file_path = file_path.relative_to(root_folder)
+
+        if should_exclude(file_path):
+            if progress is not None and task_id is not None:
+                progress.update(task_id, advance=member.size)
+            continue
+
+        target_path = install_dir / file_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        source = compressed_data.extractfile(member)
+        if source:
+            target_path.write_bytes(source.read())
+
+        if progress is not None and task_id is not None:
+            progress.update(task_id, advance=member.size)
+
+
+
+def install_ext_package(
+    package: ExtPackage,
+    progress: Progress | None = None,
+) -> bool:
     install_dir = package.install_dir
     ilog.debug(f"Install: {package.name} in {install_dir}")
+    print(progress)
 
     extension: str = get_extension(str(package.cache_file))
     if install_dir.exists():
         shutil.rmtree(install_dir)
     install_dir.mkdir(parents=True, exist_ok=True)
 
-    if extension == '.gz' and str(package.cache_file).endswith('.tar.gz'):
+    exclude: list[str] = []
+    if package.key.lower() == 'ffmpeg':
+        exclude = ('doc', 'man', 'ffplay')
+
+    if (
+        extension in ('.gz', '.xz')
+        and str(package.cache_file).endswith(f'.tar{extension}')
+    ):
+        task_id=progress.add_task(
+            "[green] Extracting...", name=package.name, start=True
+        )
+        print(red(f'.tar{extension}'))
         import tarfile
-        with tarfile.open(package.cache_file, "r:gz") as tar:
-            tar.extractall(path=install_dir)
+        compression = extension.lstrip('.')
+        with tarfile.open(package.cache_file, f"r:{compression}") as tar_file:
+            extract_tar_file(
+                tar_file,
+                install_dir=install_dir,
+                exclude=exclude,
+                progress=progress,
+                task_id=task_id,
+            )
 
     elif extension == '.zip':
         import zipfile
         with zipfile.ZipFile(package.cache_file, "r") as zip_file:
-            # Get all file paths in the zip
-            all_files = zip_file.namelist()
-
-            # Check if there's a single root folder
-            root_folders = set()
-            for file in all_files:
-                parts = Path(file).parts
-                if parts:
-                    root_folders.add(parts[0])
-
-            # If there's exactly one root folder and all files are under it
-            has_single_root = len(root_folders) == 1
-            if has_single_root:
-                root_folder = root_folders.pop()
-                # Extract each file, stripping the root folder from the path
-                for file in all_files:
-                    # Skip the root folder itself
-                    if file == root_folder or file == root_folder + '/':
-                        continue
-
-                    # Remove root folder from path
-                    new_path = Path(file).relative_to(root_folder)
-                    target_path = install_dir / new_path
-
-                    # Create directories if needed
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-
-                    # Write the file (skip if it's a directory)
-                    if not file.endswith('/'):
-                        source = zip_file.open(file)
-                        target_path.write_bytes(source.read())
-            else:
-                # No single root folder, extract normally
-                zip_file.extractall(install_dir)
+            task_id=progress.add_task(
+                "[green] Extracting...", name=package.name, start=True
+            )
+            extract_zip_file(
+                zip_file,
+                install_dir=install_dir,
+                exclude=exclude,
+                progress=progress,
+                task_id=task_id,
+            )
 
     else:
         shutil.move(package.cache_file, install_dir)
@@ -107,7 +238,7 @@ def dl_and_install_ext_package(
     # Install package
     if not package.installed or reinstall:
         if package.downloaded:
-            installed: bool = install_ext_package(package)
+            installed: bool = install_ext_package(package, progress=progress)
             if installed:
                 clean_cache(package=package)
             package.installed = installed
