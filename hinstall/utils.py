@@ -9,6 +9,8 @@ from rich.progress import (
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
+
+from hytils import red
 from .logger import ilog
 
 
@@ -136,8 +138,114 @@ def extract_zip_file(
             progress.update(task_id, advance=file_size)
 
 
-
 def extract_tar_file(
+    compressed_data: TarFile,
+    install_dir: Path,
+    exclude: list[str] = None,
+    progress: Progress | None = None,
+    task_id=None
+) -> None:
+    if True:
+        _extract_tar_file_file_count(
+            compressed_data,
+            install_dir,
+            exclude,
+            progress,
+            task_id,
+        )
+    else:
+        _extract_tar_file_file_size(
+            compressed_data,
+            install_dir,
+            exclude,
+            progress,
+            task_id,
+        )
+
+
+
+def _extract_tar_file_file_size(
+    compressed_data: TarFile,
+    install_dir: Path,
+    exclude: list[str] = None,
+    progress: Progress | None = None,
+    task_id=None
+) -> None:
+    """Extract TAR archive with progress tracking (based on file sizes),
+       excluding specified names, without double extraction.
+    """
+
+    if exclude is None:
+        exclude = []
+
+    def should_exclude(path: Path) -> bool:
+        """Check if any part of the path matches excluded names"""
+        return any(part in exclude for part in path.parts) or path.name in exclude
+
+    # ---------- FAST PRE-SCAN (NO EXTRACTION) ----------
+    members = compressed_data.getmembers()
+
+    # Count only files for size (symlinks have no data)
+    total_bytes = sum(m.size for m in members if m.isfile())
+
+    # Detect single root folder
+    root_folders = {Path(m.name).parts[0] for m in members if Path(m.name).parts}
+    has_single_root = len(root_folders) == 1
+    root_folder = next(iter(root_folders)) if has_single_root else None
+
+    show_progress: bool = progress and task_id is not None
+    if show_progress:
+        progress.update(task_id, total=total_bytes)
+
+    # ---------- EXTRACTION ----------
+    extracted_bytes = 0
+
+    for member in members:
+        file_path = Path(member.name)
+
+        # strip root folder
+        if has_single_root and root_folder:
+            if file_path.parts and file_path.parts[0] == root_folder:
+                file_path = file_path.relative_to(root_folder)
+
+        # Skip excluded paths
+        if should_exclude(file_path):
+            if show_progress and member.isfile():
+                progress.update(task_id, advance=member.size)
+            continue
+
+        target_path = install_dir / file_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Regular file
+        if member.isfile():
+            source = compressed_data.extractfile(member)
+            if source:
+                target_path.write_bytes(source.read())
+            os.chmod(target_path, member.mode)
+
+        # Symbolic link
+        elif member.issym():
+            if target_path.exists() or target_path.is_symlink():
+                target_path.unlink()
+            target_path.symlink_to(member.linkname)
+
+        # Hard link
+        elif member.islnk():
+            link_target = Path(member.linkname)
+            if has_single_root and root_folder and link_target.parts[0] == root_folder:
+                link_target = link_target.relative_to(root_folder)
+            target_path.hardlink_to(install_dir / link_target)
+
+        # Progress update (only for actual file data)
+        if show_progress and member.isfile():
+            extracted_bytes += member.size
+            progress.update(task_id, advance=member.size)
+
+
+
+
+def _extract_tar_file_file_count(
     compressed_data: TarFile,
     install_dir: Path,
     exclude: list[str] = [],
@@ -160,7 +268,9 @@ def extract_tar_file(
     has_single_root = len(root_folders) == 1
     root_folder = next(iter(root_folders)) if has_single_root else None
 
-    if progress and task_id:
+
+    show_progress: bool = progress and task_id is not None
+    if show_progress:
         progress.update(task_id, total=total_files)
 
     # Extract files
@@ -175,7 +285,7 @@ def extract_tar_file(
 
         # skip excluded
         if should_exclude(file_path):
-            if progress and task_id:
+            if show_progress:
                 progress.update(task_id, advance=1)
             continue
 
@@ -203,7 +313,7 @@ def extract_tar_file(
             target_path.hardlink_to(install_dir / link_target)
 
         # update progress
-        if progress and task_id:
+        if show_progress:
             extracted_count += 1
             progress.update(task_id, advance=1)
 

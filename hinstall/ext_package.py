@@ -371,11 +371,11 @@ class ExtPackage:
 
         elif extension == '.zip':
             import zipfile
+            task_id=progress.add_task(
+                "[green] Extracting...", name=self.name, start=True
+            )
             try:
                 with zipfile.ZipFile(self.cache_file, "r") as zip_file:
-                    task_id=progress.add_task(
-                        "[green] Extracting...", name=self.name, start=True
-                    )
                     extract_zip_file(
                         zip_file,
                         install_dir=install_dir,
