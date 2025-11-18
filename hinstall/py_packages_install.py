@@ -29,14 +29,20 @@ from .backend_dirs import g_backend_dirs
 
 
 g_backend_env = None
+
 def generate_backend_env(exclude: list[str] | None = None) -> bool:
     global g_backend_env
     try:
-        g_backend_env = _generate_backend_env(exclude=exclude)
+        backend_env = _generate_backend_env(exclude=exclude)
+        if backend_env is None:
+            ilog.critical("Backend env generation returned None (unexpected).")
+            return False
+
     except Exception as e:
         ilog.critical(f"Failed to define the backend environment: {str(e)}")
         return False
 
+    g_backend_env = backend_env
     return True
 
 

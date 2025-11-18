@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from pprint import pprint
 import sys
 import subprocess
 
@@ -39,7 +40,8 @@ from hinstall import (
     #     print(f"Error launching terminal: {e}")
 
 if __name__ == "__main__":
-    new_env = generate_backend_env()
+    generate_backend_env()
+    pprint(g_backend_env)
 
     # 1. Determine the shell and arguments
     if sys.platform == "win32":
@@ -69,7 +71,7 @@ if __name__ == "__main__":
         # os.execvpe replaces the current Python process with the shell
         # If this fails, it throws an exception (it doesn't return)
         try:
-            os.execvpe(shell, args, new_env)
+            os.execvpe(shell, args, env=g_backend_env)
         except OSError as e:
             print(f"🚨 Failed to execute shell: {e}")
 
