@@ -38,7 +38,11 @@ def main():
     PY_DATE = "20251031"
     src_archive = f"cpython-{PY_VERSION}+{PY_DATE}-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
     release_archive = f"python-{PY_VERSION}-linux-x86_64.tar.gz"
-    req_packages = ["requests"]
+    req_packages = [
+        "requests",
+        "websockets",
+        ("hytils", 'local'),
+    ]
 
     local_rehost_dir = (Path("/opt") / "herlegon" / "rehost").resolve()
 
@@ -89,8 +93,21 @@ def main():
     print("[*] Upgrading packaging tools...")
     run_command(f"{embed_python_exe} -m pip install --no-cache-dir --upgrade pip setuptools wheel")
 
-    print(f"[*] Installing requested packages: {', '.join(req_packages)}")
-    run_command(f"{embed_python_exe} -m pip install --no-cache-dir {' '.join(req_packages)}")
+    # Install required python packages
+    install_targets = []
+    for pkg in req_packages:
+        if isinstance(pkg, tuple | list) and pkg[1] == 'local':
+            base: Path = (Path(__file__).parent.parent.parent / pkg[0] ).resolve()
+            dist_dir = base / "dist"
+            if dist_dir.exists() and dist_dir.is_dir():
+                wheels = list(dist_dir.glob("*.whl"))
+                if not wheels:
+                    raise FileNotFoundError(f"No wheel found in: {dist_dir}")
+                wheel = max(wheels, key=lambda p: p.stat().st_mtime)
+                pkg = str(wheel.resolve())
+        install_targets.append(pkg)
+    print(f"[*] Installing requested packages: {', '.join(install_targets)}")
+    run_command(f"{embed_python_exe} -m pip install --no-cache-dir {' '.join(install_targets)}")
 
     print("[*] Precompiling stdlib and site-packages...")
     run_command(f"{embed_python_exe} -m compileall -q -f lib/python{python_version} || true")

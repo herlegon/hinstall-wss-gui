@@ -1,12 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    Progress,
-    TextColumn,
-    TimeRemainingColumn,
-    TransferSpeedColumn,
-)
 from .backend_dirs import g_backend_dirs
 from .ext_package import ExtPackage
 from .logger import ilog
@@ -15,7 +7,7 @@ from .logger import ilog
 
 def download_package_(
     package: ExtPackage,
-    progress: Progress | None = None,
+    task_name: str = "",
     reinstall: bool = False,
 ) -> ExtPackage:
 
@@ -47,14 +39,7 @@ def download_package_(
 
     # Finally download it from host
     if not package.downloaded and package.downloadable:
-        package.download_package_from_host(
-            progress=progress,
-            task_id=progress.add_task(
-                "[green] Installing...",
-                name=package.name,
-                start=False
-            ),
-        )
+        package.download_from_host(task_name)
 
     return package
 
@@ -62,22 +47,17 @@ def download_package_(
 
 def dl_and_install_ext_package(
     package: ExtPackage,
-    progress: Progress | None = None,
     reinstall: bool = False,
 ) -> bool:
     if package.skip:
         return True
     ilog.info(f"{package.name}")
 
-    package = download_package_(
-        package,
-        progress=progress,
-        reinstall=reinstall,
-    )
+    package = download_package_(package, reinstall=reinstall)
 
     # Install package
     if not package.installed or reinstall:
-        package.install(progress=progress)
+        package.install()
 
     if package.installed:
         ilog.info(f"{package.name}: installed")
@@ -110,44 +90,29 @@ def download_install_ext_packages(
 
 
     threads = min(max(threads, 1), len(packages))
-    progress = Progress(
-        TextColumn("[bold cyan]{task.fields[name]}", justify="right"),
-        BarColumn(bar_width=40),
-        "[progress.percentage]{task.percentage:>3.1f}%",
-        "•",
-        DownloadColumn(),
-        "•",
-        TransferSpeedColumn(),
-        "•",
-        TimeRemainingColumn(),
-    )
 
     if threads == 1:
-        with progress:
-            for package in packages:
-                success = dl_and_install_ext_package(
-                    package=package,
-                    progress=progress,
-                    reinstall=reinstall,
-                )
-                if not success:
-                    return False
+        for package in packages:
+            success = dl_and_install_ext_package(
+                package=package,
+                reinstall=reinstall,
+            )
+            if not success:
+                return False
     else:
         success: bool = True
-        with progress:
-            with ThreadPoolExecutor(max_workers=threads) as executor:
-                for result in executor.map(
-                    lambda args: dl_and_install_ext_package(**args),
-                    [
-                        {
-                            'package': package,
-                            'progress': progress,
-                            'reinstall': reinstall
-                        }
-                        for package in packages
-                    ]
-                ):
-                    success = success and result
+        with ThreadPoolExecutor(max_workers=threads) as executor:
+            for result in executor.map(
+                lambda args: dl_and_install_ext_package(**args),
+                [
+                    {
+                        'package': package,
+                        'reinstall': reinstall
+                    }
+                    for package in packages
+                ]
+            ):
+                success = success and result
         return success
 
     return True

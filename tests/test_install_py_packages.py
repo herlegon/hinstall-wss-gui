@@ -5,7 +5,6 @@ import sys
 import tomllib
 from typing import Any
 
-from hinstall.py_packages_install import get_pip_versions, get_pypackage_list, update_package_info, update_pip
 from hytils import lightcyan, lightgreen, red
 from local_rehost import get_rehost_dir
 
@@ -19,7 +18,10 @@ from hinstall import (
     generate_backend_env,
     get_python_version,
     ilog,
+    get_pip_versions,
+    get_pypackage_list,
 )
+
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 from pprint import pprint
 import sys
-import os
 import subprocess
 import json
 import zipfile

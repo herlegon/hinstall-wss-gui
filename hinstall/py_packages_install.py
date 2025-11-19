@@ -4,7 +4,7 @@ from hytils import lightcyan, lightgreen, orange, red, get_org_tempdir
 from importlib import metadata
 import os
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pprint
 import re
 import subprocess
 import sys
@@ -12,15 +12,6 @@ import time
 from urllib.parse import unquote
 
 import requests
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    Progress,
-    TextColumn,
-    TimeRemainingColumn,
-    TransferSpeedColumn,
-)
-
 from .ext_packages import ExtPackage
 
 from .py_packages import PyPackage
@@ -151,11 +142,11 @@ def _generate_backend_env(exclude: list[str] | None = None) -> dict:
 
 
 
-
-def get_python_version() -> str:
+def get_python_version(python_exe: Path | None = None) -> str:
     # Run the python executable with the '-V' or '--version' flag to get the version
     version: str = ""
-    python_exe = str(g_backend_dirs.python_exe)
+
+    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
     try:
         result = subprocess.run(
             [python_exe, '--version'],
@@ -170,8 +161,9 @@ def get_python_version() -> str:
 
 
 
-def update_pip() -> bool:
-    python_exe = str(g_backend_dirs.python_exe)
+def update_pip(python_exe: Path | None = None) -> bool:
+    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
+
     pip_command: str = f"{python_exe} -m pip install --upgrade pip"
     try:
         result = subprocess.run(
@@ -198,9 +190,12 @@ def update_pip() -> bool:
     return True
 
 
-def get_pypackage_list() -> str:
-    python_exe = str(g_backend_dirs.python_exe)
+def get_pypackage_list(python_exe: Path | None = None) -> str:
+    result_str: str = ""
+
+    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
     pip_command: str = f"{python_exe} -m pip list"
+    print(pip_command)
     try:
         result = subprocess.run(
             pip_command.split(' '),
@@ -211,27 +206,28 @@ def get_pypackage_list() -> str:
             text=True,
             env=g_backend_env,
         )
+        result_str = result.stdout.strip()
+        ilog.debug(result_str)
 
     except subprocess.CalledProcessError as e:
         # Specific error if subprocess fails
         ilog.error(f"Error occurred while updating pip: {str(e)}")
-        return ""
 
     except Exception as e:
         # Catch all other unexpected errors
         ilog.error(f"Unexpected error: {str(e)}")
-        return ""
 
-    ilog.debug(result.stdout.strip())
-    return result.stdout.strip()
+    return result_str
 
 
-def get_pip_versions() -> str:
-    python_exe = str(g_backend_dirs.python_exe)
+def get_pip_versions(python_exe: Path | None = None) -> str:
+    packages: str = ""
+
+    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
     embedded_script = (Path(__file__).parent / "get_versions.py").resolve()
     try:
         result = subprocess.run(
-            [python_exe, str(embedded_script)],
+            [str(python_exe), str(embedded_script)],
             capture_output=True,
             text=True,
             timeout=5
@@ -241,12 +237,10 @@ def get_pip_versions() -> str:
     except subprocess.CalledProcessError as e:
         # Specific error if subprocess fails
         ilog.error(f"Error occurred while updating pip: {str(e)}")
-        return ""
 
     except Exception as e:
         # Catch all other unexpected errors
         ilog.error(f"Unexpected error: {str(e)}")
-        return ""
 
     return packages
 
@@ -263,7 +257,13 @@ def update_package_info(package: PyPackage, retry: int = 3) -> None:
 
 
 
-def update_package_url(package: PyPackage, retry: int = 3) -> bool:
+def update_package_url(
+    package: PyPackage,
+    retry: int = 3,
+    python_exe: Path | None = None,
+) -> bool:
+    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
+
     timeout: float = 5
     _retry: int = retry
     if package.extra_index_url:
@@ -278,7 +278,7 @@ def update_package_url(package: PyPackage, retry: int = 3) -> bool:
     index_url: list[str] = ["--index-url", package.index_url] if package.index_url else []
     version = f"=={package.version}" if package.version != '' else ''
     pip_command: list[str] = [
-        "python",
+        python_exe,
         "-m", "pip", "download",
         # "--no-deps",
         "--no-cache-dir",
@@ -363,9 +363,14 @@ def update_package_url(package: PyPackage, retry: int = 3) -> bool:
 
 
 
-def uninstall_py_package(package: PyPackage) -> bool:
+def uninstall_py_package(
+    package: PyPackage,
+    python_exe: Path | None = None
+) -> bool:
+    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
+
     ilog.debug(f"uninstall {package.name}")
-    pip_command: str = f"python -m pip uninstall -y {package.name}"
+    pip_command: str = f"{python_exe} -m pip uninstall -y {package.name}"
     try:
         result = subprocess.run(
             pip_command.split(' '),
@@ -389,17 +394,6 @@ def install_py_packages(
     threads: int = 1,
 ) -> bool:
     threads = min(max(threads, 1), len(packages))
-    progress = Progress(
-        TextColumn("[bold cyan]{task.fields[name]}", justify="right"),
-        BarColumn(bar_width=None),
-        "[progress.percentage]{task.percentage:>3.1f}%",
-        "•",
-        DownloadColumn(),
-        "•",
-        TransferSpeedColumn(),
-        "•",
-        TimeRemainingColumn(),
-    )
 
     def _get_info(package: PyPackage) -> None:
         update_package_info(package)
@@ -429,24 +423,21 @@ def install_py_packages(
 
     success: bool = True
     if threads == 1:
-        with progress:
-            for package in packages:
-                success = download_install_py_package(
-                    package,
-                    progress=progress,
-                    retry=retry
-                )
-                if not success:
-                    break
+        for package in packages:
+            success = download_install_py_package(
+                package,
+                retry=retry
+            )
+            if not success:
+                break
 
     else:
-        with progress:
-            with ThreadPoolExecutor(max_workers=threads) as executor:
-                for result in executor.map(
-                    lambda args: download_install_py_package(*args),
-                    [(package, progress, retry) for package in packages]
-                ):
-                    success = success and result
+        with ThreadPoolExecutor(max_workers=threads) as executor:
+            for result in executor.map(
+                lambda args: download_install_py_package(*args),
+                [(package, retry) for package in packages]
+            ):
+                success = success and result
 
     if not success:
         return False
@@ -464,7 +455,6 @@ def install_py_packages(
 
 def download_install_py_package(
     package: PyPackage,
-    progress: Progress| None = None,
     retry: int = 3
 ) -> bool:
     url: str = package.url
@@ -497,16 +487,7 @@ def download_install_py_package(
         ilog.info(f"already downloaded")
 
     else:
-        ext_package.downloaded = download_package_from_host(
-            ext_package,
-            progress=progress,
-            task_id=progress.add_task(
-                "[green] Installing...",
-                name=ext_package.name,
-                start=False
-            ),
-            retry=retry
-        )
+        ext_package.download_from_host()
 
     pprint(ext_package)
     if not ext_package.downloaded:

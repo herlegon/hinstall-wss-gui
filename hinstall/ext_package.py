@@ -8,7 +8,6 @@ from pathlib import Path
 import re
 import shutil
 import requests
-from rich.progress import Progress, TaskID
 from urllib.error import URLError
 
 from .backend_dirs import g_backend_dirs
@@ -264,11 +263,7 @@ class ExtPackage:
 
 
 
-    def download_package_from_host(
-        self,
-        progress: Progress| None = None,
-        task_id: TaskID | None = None,
-    ) -> bool:
+    def download_from_host(self) -> bool:
 
         if not self.tag:
             ilog.error(f"Tag file not valid for package: {self.name}")
@@ -289,9 +284,7 @@ class ExtPackage:
         _retry: int = self.retry_count
         while _retry:
             ilog.debug(f"Downloading: {self.name} to {tmp_dir}")
-            if progress is not None:
-                progress.update(task_id, total=self.size)
-                progress.start_task(task_id)
+            ilog.info(f"total_size={self.size}")
 
             with open(self.cache_file, "wb") as f:
                 try:
@@ -300,8 +293,7 @@ class ExtPackage:
                     # Update every 512KB
                     wrapper = ProgressWrapper(
                         self.response.raw,
-                        progress,
-                        task_id,
+                        task_name=f"[{self.name}][install]",
                         update_threshold=512*1024
                     )
 
@@ -326,7 +318,7 @@ class ExtPackage:
 
 
 
-    def install(self, progress: Progress | None = None) -> bool:
+    def install(self) -> bool:
         self.installed = False
         if not self.downloaded:
             ilog.error(f"Cannot install {self.name}. Reason: not downloaded")
@@ -351,10 +343,9 @@ class ExtPackage:
             extension in ('.gz', '.xz')
             and str(self.cache_file).endswith(f'.tar{extension}')
         ):
-            task_id=progress.add_task(
-                "[green] Extracting...", name=self.name, start=True
-            )
             import tarfile
+
+            task_name = f"[{self.name}][install]"
             compression = extension.lstrip('.')
             try:
                 with tarfile.open(self.cache_file, f"r:{compression}") as tar_file:
@@ -362,8 +353,7 @@ class ExtPackage:
                         tar_file,
                         install_dir=install_dir,
                         exclude=exclude,
-                        progress=progress,
-                        task_id=task_id,
+                        task_name=task_name
                     )
                     installed = True
             except Exception as e:
@@ -371,17 +361,15 @@ class ExtPackage:
 
         elif extension == '.zip':
             import zipfile
-            task_id=progress.add_task(
-                "[green] Extracting...", name=self.name, start=True
-            )
+
+            task_name = f"[{self.name}][install]"
             try:
                 with zipfile.ZipFile(self.cache_file, "r") as zip_file:
                     extract_zip_file(
                         zip_file,
                         install_dir=install_dir,
                         exclude=exclude,
-                        progress=progress,
-                        task_id=task_id,
+                        task_name=task_name,
                     )
                     installed = True
             except Exception as e:

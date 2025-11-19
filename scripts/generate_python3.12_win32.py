@@ -39,7 +39,11 @@ def main():
     PY_VERSION = "3.12.10"
     src_archive: str = f"python-{PY_VERSION}-embed-amd64.zip"
     release_archive = f"python-{PY_VERSION}-win-x86_64.tar.gz"
-    req_packages = ["requests"]
+    req_packages = [
+        "requests",
+        "websockets",
+        ("hytils", 'local'),
+    ]
 
     local_rehost_dir = (Path(__file__).parent.parent.parent / "herlegon" / "rehost").resolve()
 
@@ -168,10 +172,22 @@ def main():
     subprocess.run([str(workdir / "python.exe"), "-m", "pip", "--version"], cwd=workdir)
 
 
-    # Install packages
-    print(f"[*] Installing packages: {req_packages}")
+    # Install required python packages
+    install_targets = []
+    for pkg in req_packages:
+        if isinstance(pkg, tuple | list) and pkg[1] == 'local':
+            base: Path = (Path(__file__).parent.parent.parent / pkg[0] ).resolve()
+            dist_dir = base / "dist"
+            if dist_dir.exists() and dist_dir.is_dir():
+                wheels = list(dist_dir.glob("*.whl"))
+                if not wheels:
+                    raise FileNotFoundError(f"No wheel found in: {dist_dir}")
+                wheel = max(wheels, key=lambda p: p.stat().st_mtime)
+                pkg = str(wheel.resolve())
+        install_targets.append(pkg)
+    print(f"[*] Installing requested packages: {', '.join(install_targets)}")
     subprocess.run(
-        [str(workdir / "python.exe"), "-m", "pip", "install", "--no-cache-dir", *req_packages],
+        [str(workdir / "python.exe"), "-m", "pip", "install", "--no-cache-dir", *install_targets],
         cwd=workdir,
         check=True,
     )

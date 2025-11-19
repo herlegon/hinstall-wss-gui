@@ -40,23 +40,23 @@ do_cache = true
 #===========================================================
 [py_packages]
 [py_packages.common]
-# pypi = [
+pypi = [
+# In python package, because critical or small
 #     "websockets",
+#     "hytils",
+# To upgrade
+#     "nvidia-ml-py",
 #     "psutil",
+      "hsys",
 #     "opencv-python",
 #     "numpy",
-#     "nvidia-ml-py",
 #     "timm",
 #     "onnx",
 #     "onnxruntime",
 #     "safetensors",
 #     "hytils",
-#     "hsys",
 #     "backend",
 #     "pynnlib",
-# ]
-pypi = [
-    "websockets",
 ]
 
 

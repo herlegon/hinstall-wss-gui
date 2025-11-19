@@ -29,6 +29,8 @@ from .py_packages_install import (
     get_python_version,
     generate_backend_env,
     g_backend_env,
+    get_pypackage_list,
+    get_pip_versions,
 )
 
 __all__ = [
@@ -50,5 +52,8 @@ __all__ = [
 
     "get_domain_from_url",
     "check_site_reachable",
+
+    "get_pypackage_list",
+    "get_pip_versions",
 
 ]
