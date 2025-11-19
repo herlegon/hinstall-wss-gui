@@ -42,8 +42,8 @@ do_cache = true
 [py_packages.common]
 pypi = [
 # In python package, because critical or small
-#     "websockets",
-#     "hytils",
+    "websockets",
+    "hytils",
 # To upgrade
 #     "nvidia-ml-py",
 #     "psutil",

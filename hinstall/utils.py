@@ -50,6 +50,7 @@ class ProgressWrapper:
         self.update_threshold = update_threshold
         self.task_name = task_name
         self.bytes_downloaded = 0
+        self.last_time = time.time()
 
 
     def read(self, size=-1):
@@ -57,8 +58,11 @@ class ProgressWrapper:
         if data:
             self.bytes_downloaded += len(data)
             if self.bytes_downloaded >= self.update_threshold:
-                ilog.info(f"{self.task_name}:progress={self.bytes_downloaded}")
+                if time.time() - self.last_time >= 0.25:
+                    ilog.info(f"{self.task_name}progress={self.bytes_downloaded}")
                 self.bytes_downloaded = 0
+            self.last_time = time.time()
+
         return data
 
 
@@ -221,8 +225,9 @@ def _extract_tar_file_file_size(
             target_path.hardlink_to(install_dir / link_target)
 
         # Progress update (only for actual file data)
-        ilog.info(f"{task_name}:progress={member.size}")
+        ilog.info(f"{task_name}:progress={extracted_bytes}")
         extracted_bytes += member.size
+    ilog.info(f"{task_name}:progress={total_bytes}")
 
 
 
@@ -248,10 +253,11 @@ def _extract_tar_file_file_count(
     has_single_root = len(root_folders) == 1
     root_folder = next(iter(root_folders)) if has_single_root else None
 
-    ilog.info(f"{task_name}:total={total_files}")
+    ilog.info(f"{task_name}total={total_files}")
 
     # Extract files
     extracted_count = 0
+    last_time = time.time()
     for member in file_members:
         file_path = Path(member.name)
 
@@ -262,7 +268,7 @@ def _extract_tar_file_file_count(
 
         # skip excluded
         if should_exclude(file_path):
-            ilog.info(f"{task_name}:progress=1")
+            ilog.info(f"{task_name}:progress={extracted_count}")
 
         target_path = install_dir / file_path
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -288,7 +294,9 @@ def _extract_tar_file_file_count(
             target_path.hardlink_to(install_dir / link_target)
 
         # update progress
-        ilog.info(f"{task_name}:progress=1")
+        if time.time() - last_time >= 0.1:
+            ilog.info(f"{task_name}:progress={extracted_count}")
+            last_time = time.time()
         extracted_count += 1
 
-    compressed_data.extractall
+    ilog.info(f"{task_name}:progress={total_files}")

@@ -60,19 +60,22 @@ if __name__ == "__main__":
     backend_env = generate_backend_env()
 
 
-    py_packages = PyPackages(packages_cfg, sys.platform)
+    py_packages = PyPackages(packages_cfg, sys.platform, keep_up_to_date=True)
     py_packages = py_packages.get_initial()
-    pprint(py_packages)
 
     print(get_python_version())
 
 
-    get_pypackage_list()
+    # get_pypackage_list()
 
     # update_package_info(py_packages[0])
 
-    installed_versions = get_pip_versions()
-    pprint(installed_versions)
+    # installed_versions = get_pip_versions()
+
+
+
+    pprint(py_packages)
+
 
     # install_py_packages(
     #     python_exe=python_exe,

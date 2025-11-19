@@ -244,7 +244,9 @@ class ExtPackage:
             raise ValueError(f"local_host must be defined")
 
         local_fp: Path = g_backend_dirs.local_host / self.filename
-        ilog.debug(f"Copy from local host: {local_fp}")
+        ilog.info(f"[{self.name}] download from local host")
+        ilog.info(f"[{self.name}][dl]pprogress=0")
+        ilog.debug(f"{self.name}: {local_fp}")
 
         if local_fp.exists():
             self._update_cache_file()
@@ -256,9 +258,10 @@ class ExtPackage:
             self.downloaded = True
 
         else:
-            ilog.error(f"Missing file: {local_fp}")
+            ilog.error(f"[{self.name}] missing file: {local_fp}")
             self.downloaded = False
 
+        ilog.info(f"[{self.name}][dl]pprogress=100")
         return self.downloaded
 
 
@@ -269,6 +272,7 @@ class ExtPackage:
             ilog.error(f"Tag file not valid for package: {self.name}")
             return False
 
+        ilog.info(f"[{self.name}][dl]pprogress=0")
         # Force to false because we clean the cache directories
         self.downloaded = False
 
@@ -284,7 +288,7 @@ class ExtPackage:
         _retry: int = self.retry_count
         while _retry:
             ilog.debug(f"Downloading: {self.name} to {tmp_dir}")
-            ilog.info(f"total_size={self.size}")
+            ilog.info(f"[{self.name}][dl]total={self.size}")
 
             with open(self.cache_file, "wb") as f:
                 try:
@@ -293,7 +297,7 @@ class ExtPackage:
                     # Update every 512KB
                     wrapper = ProgressWrapper(
                         self.response.raw,
-                        task_name=f"[{self.name}][install]",
+                        task_name=f"[{self.name}][dl]",
                         update_threshold=512*1024
                     )
 
@@ -308,12 +312,16 @@ class ExtPackage:
 
             if _retry == 0:
                 ilog.debug(f"[E] failed downloading {self.filename}")
+                ilog.info(f"[{self.name}][dl]progress=-1")
                 return False
 
             _retry = 0
 
+
         tag_file.touch()
         self.downloaded = True
+        ilog.info(f"[{self.name}][dl]progress={self.size}")
+
         return True
 
 

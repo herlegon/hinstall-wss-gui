@@ -1,7 +1,15 @@
 
 from dataclasses import dataclass
+import json
+from pathlib import Path
+import subprocess
 import sys
 from typing import Any, Literal
+
+import requests
+
+from .backend_dirs import g_backend_dirs
+from .logger import ilog
 
 
 
@@ -33,14 +41,21 @@ class PyPackage:
     size: int = 0
     supported: bool = True
     installed: bool = False
-    installed_version: str = ""
+    latest_version: str = ""
     uninstall_before: bool = False
     delayed_install: bool = False
     do_cache: bool = False
 
-    def is_installed(self) -> bool:
-        # print(lightcyan(f"[{self.installed_version}] vs [{self.version}]"))
-        return bool(self.version == self.installed_version)
+
+    def get_latest_version(self):
+        ilog.debug(f"[{self.name}]: get version")
+        url = f"https://pypi.org/pypi/{self.name}/json"
+        r = requests.get(url)
+        if r.status_code != 200:
+            ilog.debug(f"[{self.name}]: Failed to get version")
+            return
+        data = r.json()
+        self.latest_version = data["info"]["version"]
 
 
 
@@ -49,16 +64,17 @@ class PyPackages(list):
     def __init__(
         self,
         config: dict = None,
-        platform: str = ""
+        platform: str = "",
+        keep_up_to_date: bool = False,
     ):
         super().__init__()
         if config:
             if not platform:
                 platform = sys.platform
-            self._parse_and_populate(config, platform)
+            self._parse_and_populate(config, platform, keep_up_to_date)
 
 
-    def _parse_and_populate(self, config: dict, platform: str):
+    def _parse_and_populate(self, config: dict, platform: str, keep_up_to_date: bool):
         platform_data = (
             config
             .get('py_packages', {})
@@ -159,6 +175,47 @@ class PyPackages(list):
                             supported=False,
                         )
                     )
+
+        self.update_installed_versions()
+        if keep_up_to_date:
+            self.update_latest_versions()
+
+
+    def update_installed_versions(self) -> None:
+        packages_versions: dict[str, str] = {}
+
+        python_exe = str(g_backend_dirs.python_exe)
+        embedded_script = (Path(__file__).parent / "get_versions.py").resolve()
+        try:
+            result = subprocess.run(
+                [str(python_exe), str(embedded_script)],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            packages_versions = json.loads(result.stdout)
+
+        except subprocess.CalledProcessError as e:
+            # Specific error if subprocess fails
+            ilog.error(f"Error occurred while updating pip: {str(e)}")
+
+        except Exception as e:
+            # Catch all other unexpected errors
+            ilog.error(f"Unexpected error: {str(e)}")
+
+        if packages_versions:
+            for pkg in self:
+                pkg: PyPackage
+                pkg.version = (
+                    packages_versions.get(pkg.name, pkg.version)
+                )
+                pkg.installed = True if pkg.version else False
+
+
+    def update_latest_versions(self) -> None:
+        for pkg in self:
+            pkg: PyPackage
+            pkg.get_latest_version()
 
 
     def get_initial(self) -> 'PyPackages':

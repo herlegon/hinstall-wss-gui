@@ -195,7 +195,6 @@ def get_pypackage_list(python_exe: Path | None = None) -> str:
 
     python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
     pip_command: str = f"{python_exe} -m pip list"
-    print(pip_command)
     try:
         result = subprocess.run(
             pip_command.split(' '),
@@ -220,8 +219,8 @@ def get_pypackage_list(python_exe: Path | None = None) -> str:
     return result_str
 
 
-def get_pip_versions(python_exe: Path | None = None) -> str:
-    packages: str = ""
+def get_pip_versions(python_exe: Path | None = None) -> dict[str, str]:
+    packages: dict[str, str] = {}
 
     python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
     embedded_script = (Path(__file__).parent / "get_versions.py").resolve()
