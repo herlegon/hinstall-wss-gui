@@ -11,7 +11,6 @@ from .utils import (
 
 from .ext_package import ExtPackage
 from .ext_packages import ExtPackages
-
 from .ext_packages_install import (
     download_install_ext_packages,
 )
@@ -20,11 +19,8 @@ from .parse_package_config import (
     parse_packages_toml_,
 )
 
-from .py_packages import (
-    PyPackage,
-    PyPackages,
-)
-
+from .py_package import PyPackage
+from .py_packages import PyPackages
 from .py_packages_install import (
     get_python_version,
     generate_backend_env,

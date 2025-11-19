@@ -95,7 +95,7 @@ tensorrt = "10.14.1.48.post1"
 
 # DirectML
 [py_packages.delayed.directml]
-directml = "onnxruntime-directml"
+onnxruntime-directml = "1.23.0"
 
 
 
@@ -121,3 +121,4 @@ torch-cuda = "PyTorch (CUDA)"
 torch-cpu = "PyTorch (CPU)"
 torch-rocm = "PyTorch (ROCm)"
 torchvision = "TorchVision"
+onnxruntime-directml = "ONNX Runtime (Direct ML)"

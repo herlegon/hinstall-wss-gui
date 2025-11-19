@@ -1,15 +1,12 @@
-
-from dataclasses import dataclass
 import json
 from pathlib import Path
 import subprocess
 import sys
 from typing import Any, Literal
 
-import requests
-
 from .backend_dirs import g_backend_dirs
 from .logger import ilog
+from .py_package import PyPackage
 
 
 
@@ -26,36 +23,6 @@ HERLEGON_PACKAGES: tuple[str] = (
     # pynnlib must always use the latest release: source only
     'pynnlib',
 )
-
-
-
-@dataclass
-class PyPackage:
-    pretty_name: str
-    name: str
-    variant: str = ""
-    version: str = ""
-    extra_index_url: str = ""
-    wheel: str = ""
-    url: str = ""
-    size: int = 0
-    supported: bool = True
-    installed: bool = False
-    latest_version: str = ""
-    uninstall_before: bool = False
-    delayed_install: bool = False
-    do_cache: bool = False
-
-
-    def get_latest_version(self):
-        ilog.debug(f"[{self.name}]: get version")
-        url = f"https://pypi.org/pypi/{self.name}/json"
-        r = requests.get(url)
-        if r.status_code != 200:
-            ilog.debug(f"[{self.name}]: Failed to get version")
-            return
-        data = r.json()
-        self.latest_version = data["info"]["version"]
 
 
 
@@ -88,8 +55,9 @@ class PyPackages(list):
         common = platform_data.get('common', {})
         if 'pypi' in common:
             for pkg_name in common['pypi']:
+                pretty_name = pretty_names.get(pkg_name, pkg_name)
                 self.append(PyPackage(
-                    pretty_name=pretty_names.get(pkg_name, pkg_name),
+                    pretty_name=pretty_name,
                     name=pkg_name,
                     version="",
                 ))
@@ -155,15 +123,11 @@ class PyPackages(list):
                                         supported=False,
                                     )
                                 )
+
                 else:
                     # Simple key-value pair
-                    pretty_name = (
-                        pretty_names.get(
-                            f"{pkg_name}-{key}", pretty_names.get(pkg_name, pkg_name)
-                        )
-                        if key
-                        else pretty_names.get(pkg_name, pkg_name)
-                    )
+                    pkg_name = key
+                    pretty_name = pretty_names.get(pkg_name, pkg_name)
                     self.append(
                             PyPackage(
                             pretty_name=pretty_name,
@@ -206,10 +170,10 @@ class PyPackages(list):
         if packages_versions:
             for pkg in self:
                 pkg: PyPackage
-                pkg.version = (
-                    packages_versions.get(pkg.name, pkg.version)
+                pkg.installed_version = (
+                    packages_versions.get(pkg.name, pkg.installed_version)
                 )
-                pkg.installed = True if pkg.version else False
+                pkg.installed = True if pkg.installed_version else False
 
 
     def update_latest_versions(self) -> None:

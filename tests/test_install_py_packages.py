@@ -13,6 +13,7 @@ from hinstall import (
     parse_packages_toml_,
     ExtPackages,
     PyPackages,
+    PyPackage,
     g_backend_dirs,
     download_install_ext_packages,
     generate_backend_env,
@@ -60,11 +61,21 @@ if __name__ == "__main__":
     backend_env = generate_backend_env()
 
 
-    py_packages = PyPackages(packages_cfg, sys.platform, keep_up_to_date=True)
+    keep_up_to_date: bool = False
+
+    py_packages = PyPackages(
+        packages_cfg,
+        sys.platform,
+        keep_up_to_date=keep_up_to_date
+    )
     py_packages = py_packages.get_initial()
 
     print(get_python_version())
 
+    uninstalled_packages = py_packages.get_not_installed()
+
+    # print("uninstalled")
+    # pprint(uninstalled_packages)
 
     # get_pypackage_list()
 
@@ -72,9 +83,11 @@ if __name__ == "__main__":
 
     # installed_versions = get_pip_versions()
 
+    for pkg in uninstalled_packages:
+        pkg: PyPackage
+        pkg.update_wheel_url()
 
-
-    pprint(py_packages)
+    pprint(uninstalled_packages)
 
 
     # install_py_packages(

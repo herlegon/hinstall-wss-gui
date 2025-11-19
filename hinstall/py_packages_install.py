@@ -190,6 +190,7 @@ def update_pip(python_exe: Path | None = None) -> bool:
     return True
 
 
+
 def get_pypackage_list(python_exe: Path | None = None) -> str:
     result_str: str = ""
 
@@ -219,6 +220,7 @@ def get_pypackage_list(python_exe: Path | None = None) -> str:
     return result_str
 
 
+
 def get_pip_versions(python_exe: Path | None = None) -> dict[str, str]:
     packages: dict[str, str] = {}
 
@@ -245,210 +247,80 @@ def get_pip_versions(python_exe: Path | None = None) -> dict[str, str]:
 
 
 
-def update_package_info(package: PyPackage, retry: int = 3) -> None:
-    installed_version: str = ""
-    try:
-        installed_version = metadata.metadata(package.name).json['version']
-        ilog.debug(f"{package.pretty_name}: {installed_version}")
-        package.installed_version = installed_version
-    except:
-        ilog.info(f"Package {package.pretty_name} is not installed")
 
 
 
-def update_package_url(
-    package: PyPackage,
-    retry: int = 3,
-    python_exe: Path | None = None,
-) -> bool:
-    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
 
-    timeout: float = 5
-    _retry: int = retry
-    if package.extra_index_url:
-        regex: re.Pattern = re.compile(rf".*Downloading\s*(https:\/\/.*\/.*\.whl)")
-    else:
-        regex: re.Pattern = re.compile(rf".*{package.name}.*(https:\/\/.*\/.*\.whl)\.metadata")
 
-    already_installed_regex = re.compile(rf".*Requirement\s*already\s*satisfied:\s*{package.name}")
-    url: str = ""
 
-    start_time: float = time.time()
-    index_url: list[str] = ["--index-url", package.index_url] if package.index_url else []
-    version = f"=={package.version}" if package.version != '' else ''
-    pip_command: list[str] = [
-        python_exe,
-        "-m", "pip", "download",
-        # "--no-deps",
-        "--no-cache-dir",
-        f"{package.name}{version}",
-        *index_url,
-        "--progress-bar=off",
-        "-vvv"
-    ]
-    pip_command = list([x for x in pip_command if x != '' and x is not None])
-    # print(' '.join(pip_command))
-    while _retry > 0 and url == '' and not package.installed and package.supported:
-        sub_process = subprocess.Popen(
-            pip_command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT
-        )
 
-        start_time = time.time()
-        while (
-            (time.time() - start_time) < timeout + (retry - _retry) * 5
-            and sub_process.poll() is None
-        ):
-            try:
-                line = sub_process.stdout.readline().decode('utf-8').strip()
-            except:
-                break
-            if package.name == 'torch':
-                # and line.startswith("Obtaining dependency information"):
-                print(lightcyan(line))
 
-            # if _retry < retry:
-            #     ilog.debug(line)
+    def install_py_packages(
+        packages: tuple[PyPackage],
+        retry: int = 3,
+        threads: int = 1,
+    ) -> bool:
+        threads = min(max(threads, 1), len(packages))
 
-            if (result := re.search(regex, line)):
-                sub_process.terminate()
-                url = result.group(1)
-                break
+        def _get_info(package: PyPackage) -> None:
+            update_package_info(package)
+            update_package_url(package)
+            ilog.debug(f"{package.pretty_name}: {package.url}")
+            if package.supported:
+                if not package.is_installed():
+                    ilog.info(orange(
+                        f"{package.pretty_name} has to be updated: "
+                        + f"{package.installed_version} -> {package.version}"
+                    ))
+                else:
+                    ilog.info(lightgreen(
+                        f"{package.pretty_name} is already installed: {package.version}"
+                    ))
 
-            if (result := re.search(already_installed_regex, line)):
-                sub_process.terminate()
-                package.installed = True
-                break
 
-            if "No matching distribution found" in line:
-                sub_process.terminate()
-                package.supported = False
-                ilog.warning(f"[W] {package.pretty_name} is not supported on this platform")
-                break
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            executor.map(_get_info, packages)
 
-        if url == '' or package.installed:
-            if sub_process.poll() is None:
-                sub_process.terminate()
-            while sub_process.poll() is None and (time.time() - start_time) > 2:
-                time.sleep(0.5)
 
-            if not package.installed and package.supported:
-                _retry -= 1
-                timeout += (retry - _retry) * 5
-                ilog.warning(f"retry: {_retry}, new timeout: timeout")
+        packages = [package for package in packages if not package.is_installed()]
+        pprint(packages)
+        if not packages:
+            ilog.info(f"No packages to update")
+            return True
 
-    package.url = url
-    if package.url == '' and not package.installed and package.supported:
-        ilog.error(red(f"[E] Failed  to fetch url for {package.name}"))
+        success: bool = True
+        if threads == 1:
+            for package in packages:
+                success = download_install_py_package(
+                    package,
+                    retry=retry
+                )
+                if not success:
+                    break
 
-    elif package.installed:
-        ilog.info(f"{package.pretty_name} already installed")
+        else:
+            with ThreadPoolExecutor(max_workers=threads) as executor:
+                for result in executor.map(
+                    lambda args: download_install_py_package(*args),
+                    [(package, retry) for package in packages]
+                ):
+                    success = success and result
 
-    elif package.url != '':
-        package.wheel = unquote(package.url.split('/')[-1])
-        package.version = unquote(package.wheel.split('-')[1])
-        response: requests.Response
-        try:
-            response = requests.get(package.url, stream=True)
-            response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            if str(e).startswith('404'):
-                ilog.error(f"File {package.url} not found")
+        if not success:
             return False
-        package.size=int(response.headers.get('Content-length', 0))
 
-    return True
+        # Install remaining packages
+        print("remaining packages")
+        for package in packages:
+            if package.delayed_install and not package.installed:
+                package.delayed_install = False
+                download_install_py_package(package)
 
-
-
-def uninstall_py_package(
-    package: PyPackage,
-    python_exe: Path | None = None
-) -> bool:
-    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
-
-    ilog.debug(f"uninstall {package.name}")
-    pip_command: str = f"{python_exe} -m pip uninstall -y {package.name}"
-    try:
-        result = subprocess.run(
-            pip_command.split(' '),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-        )
-
-    except Exception as e:
-        # Catch all other unexpected errors
-        ilog.error(f"Unexpected error: {str(e)}")
-        return False
-
-    ilog.debug(result.stdout.strip())
-    return True
-
-
-
-def install_py_packages(
-    packages: tuple[PyPackage],
-    retry: int = 3,
-    threads: int = 1,
-) -> bool:
-    threads = min(max(threads, 1), len(packages))
-
-    def _get_info(package: PyPackage) -> None:
-        update_package_info(package)
-        update_package_url(package)
-        ilog.debug(f"{package.pretty_name}: {package.url}")
-        if package.supported:
-            if not package.is_installed():
-                ilog.info(orange(
-                    f"{package.pretty_name} has to be updated: "
-                    + f"{package.installed_version} -> {package.version}"
-                ))
-            else:
-                ilog.info(lightgreen(
-                    f"{package.pretty_name} is already installed: {package.version}"
-                ))
-
-
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        executor.map(_get_info, packages)
-
-
-    packages = [package for package in packages if not package.is_installed()]
-    pprint(packages)
-    if not packages:
-        ilog.info(f"No packages to update")
         return True
 
-    success: bool = True
-    if threads == 1:
-        for package in packages:
-            success = download_install_py_package(
-                package,
-                retry=retry
-            )
-            if not success:
-                break
 
-    else:
-        with ThreadPoolExecutor(max_workers=threads) as executor:
-            for result in executor.map(
-                lambda args: download_install_py_package(*args),
-                [(package, retry) for package in packages]
-            ):
-                success = success and result
 
-    if not success:
-        return False
 
-    # Install remaining packages
-    print("remaining packages")
-    for package in packages:
-        if package.delayed_install and not package.installed:
-            package.delayed_install = False
-            download_install_py_package(package)
-
-    return True
 
 
 
