@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
 from pathlib import Path
 from pprint import pprint
+import re
 import signal
 import subprocess
 import sys
@@ -65,7 +66,9 @@ if __name__ == "__main__":
     backend_env = generate_backend_env()
 
 
+    # Python packages
     keep_up_to_date: bool = False
+    # g_backend_dirs.python_exe = "python"
 
     py_packages = PyPackages(
         packages_cfg,
@@ -157,12 +160,12 @@ if __name__ == "__main__":
     cache_dir = str(g_backend_dirs.cache)
     # Cache only the big packages
     print(f"Cache: {cache_dir}")
+    print("Packages to install", lightcyan(", ".join((pkg.name for pkg in uninstalled_packages))))
 
-    for pkg in uninstalled_packages:
+    for pkg in initial_packages:
         pkg: PyPackage
         pkg.do_cache = True
 
-        # pkg.update_info()
         # if pkg.installed:
         #     continue
         # pprint(pkg)
@@ -172,20 +175,121 @@ if __name__ == "__main__":
             if pkg.version
             else pkg.name
         )
+        if pkg.name !=  "opencv-python":
+            continue
+
         if pkg.do_cache:
-            cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps {pnv}"
-            try:
-                subprocess.run(
-                    cmd.split()
+            # cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps {pnv}"
+            # try:
+            #     subprocess.run(
+            #         cmd.split()
+            #     )
+            # except Exception as e:
+            #     ilog.critical(f"failed to download wheel: {str(e)}")
+
+            start_time = time.time()
+
+
+            if True:
+                print(red("download"))
+                cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps --no-cache-dir {pnv}"
+                # try:
+                process = subprocess.Popen(
+                    cmd.split(),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
                 )
-            except Exception as e:
-                ilog.critical(f"failed to download wheel: {str(e)}")
 
-        cmd = f"{python_exe} -m pip install --find-links {cache_dir} {pnv}"
-        try:
-            subprocess.run(
-                cmd.split()
-            )
-        except Exception as e:
-            ilog.critical(f"failed to install package {pkg.name}: {str(e)}")
+                wheel = ""
+                output_lines = []
+                for line in process.stdout:
+                    line = line.rstrip()
+                    output_lines.append(line)
 
+                    # Parse download progress (e.g., "Downloading torch-2.0.0-cp311-cp311-linux_x86_64.whl (2.3GB)")
+                    if 'Downloading' in line:
+                        # Extract size info if present
+                        # Format: "Downloading package-1.0-py3-none-any.whl (1.2MB)"
+
+                        if match := re.search(r'([^\s]+\.whl)(?!\.metadata)', line):
+                            ilog.info(f"⬇️  {line}")
+                            wheel = match.group(1)
+                            break
+                    #     else:
+                    #         print(line)
+                    # else:
+                    #     print(line)
+
+                if not wheel:
+                    print(output_lines)
+
+                filepath = g_backend_dirs.cache / wheel
+                print(red(filepath))
+
+                # Monitor file growth
+                while process.poll() is None:
+                    if filepath.is_file():
+                        current_size = filepath.stat().st_size
+                        # Log progress based on file size
+                        ilog.info(f"Downloaded: {current_size / (1024**2):.1f} MB")
+                    time.sleep(0.2)
+
+
+
+                    # for line in process.stdout:
+                    #     line = line.rstrip()
+
+                    #     # Parse download progress (e.g., "Downloading torch-2.0.0-cp311-cp311-linux_x86_64.whl (2.3GB)")
+                    #     if 'Downloading' in line:
+                    #         # Extract size info if present
+                    #         # Format: "Downloading package-1.0-py3-none-any.whl (1.2MB)"
+                    #         match = re.search(r'([\d.]+\s*[KMGT]B)', line)
+                    #         if match:
+                    #             ilog.info(f"⬇️  {line}")
+                    #         else:
+                    #             ilog.info(f"⬇️  {line}")
+
+                    #     else:
+                    #         print(lightcyan(line))
+                    # process.wait()
+                    # if process.returncode != 0:
+                    #     ilog.error(f"Download failed with code {process.returncode}")
+
+                # except Exception as e:
+                #     ilog.critical(f"failed to download wheel: {str(e)}")
+
+                print(red("END "))
+
+            else:
+                pkg.update_info()
+                pkg.download_wheel()
+            elapsed = time.time() - start_time
+            ilog.info(f"downloaded in {elapsed:.02f}s")
+
+
+
+
+    def download_wheel_with_file_monitoring(self) -> bool:
+        """Download with pip while monitoring file growth for progress"""
+        g_backend_dirs.cache.mkdir(parents=True, exist_ok=True)
+        filepath = g_backend_dirs.cache / self.wheel
+
+        # Start pip download in background
+        cmd = [python_exe, '-m', 'pip', 'download', '-d', cache_dir, '--no-deps', pnv]
+
+
+
+
+        # cmd = f"{python_exe} -m pip install --find-links {cache_dir} {pnv}"
+        # try:
+        #     subprocess.run(
+        #         cmd.split()
+        #     )
+        # except Exception as e:
+        #     ilog.critical(f"failed to install package {pkg.name}: {str(e)}")
+
+
+    # for pkg in initial_packages:
+    #     pkg.uninstall()

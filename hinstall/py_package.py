@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import platform
 from pprint import pprint
+import time
 import requests
 import subprocess
 import sys
@@ -206,7 +207,7 @@ class PyPackage:
 
             arch = "win_amd64"
             # Step 4: Construct wheel filename
-            wheel_name = f"{self.name}-{version}-cp{python_version}-cp{python_version}-{arch}.whl"
+            self.wheel = f"{self.name}-{version}-cp{python_version}-cp{python_version}-{arch}.whl"
 
             # URL encode '+' in the version string
             if '+' in version:
@@ -214,15 +215,15 @@ class PyPackage:
             else:
                 compute_platform = 'cpu'
 
-            wheel_url = f"https://download.pytorch.org/whl/{compute_platform}/{quote(wheel_name)}"
+            wheel_url = f"https://download.pytorch.org/whl/{compute_platform}/{quote(self.wheel)}"
 
             # Step 5: Check wheel existence (HEAD request)
             response = requests.head(wheel_url, allow_redirects=True, timeout=10)
             if response.status_code == 200:
                 self.size = int(response.headers.get("content-length", 0))
                 self.wheel_url = wheel_url
-                self.wheel = wheel_name
-                # print(f"Found PyTorch wheel: {wheel_name}, size: {self.size / (1024**2):.2f} MB")
+                self.wheel = self.wheel
+                # print(f"Found PyTorch wheel: {self.wheel}, size: {self.size / (1024**2):.2f} MB")
                 return True
             else:
                 ilog.error(f"Wheel not found: {wheel_url}, status: {response.status_code}")
@@ -395,3 +396,120 @@ class PyPackage:
         return False
 
 
+
+
+
+
+
+
+    @staticmethod
+    def format_time(seconds: float) -> str:
+        """Format seconds to human readable time"""
+        if seconds < 60:
+            return f"{seconds:.0f}s"
+        elif seconds < 3600:
+            minutes = seconds / 60
+            return f"{minutes:.1f}m"
+        else:
+            hours = seconds / 3600
+            return f"{hours:.1f}h"
+
+
+    def download_wheel(self, timeout: int = 300) -> bool:
+        """Download wheel with percentage progress
+
+        Args:
+            url: Direct URL to wheel file
+            cache_dir: Directory to save wheel
+            self.wheel: Filename for the wheel
+            timeout: Request timeout in seconds
+
+        Returns:
+            True if successful, False otherwise
+        """
+        g_backend_dirs.cache.mkdir(parents=True, exist_ok=True)
+        filepath = g_backend_dirs.cache / self.wheel
+
+        pprint(self)
+        print(red(filepath))
+
+        if not self.wheel_url:
+            ilog.error(f"cannot download with request, TODO use pip as a fallback")
+
+        try:
+            ilog.info(f"Downloading {self.wheel}...")
+
+            response = requests.get(
+                self.wheel_url,
+                stream=True,
+                timeout=timeout,
+                allow_redirects=True
+            )
+            response.raise_for_status()
+
+            total_size = int(response.headers.get('content-length', 0))
+
+            if total_size == 0:
+                ilog.warning(f"Unknown file size for {self.wheel}")
+
+            downloaded = 0
+            start_time = time.time()
+            last_log_time = start_time
+
+            with open(filepath, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+
+                        # Log progress every 0.5 seconds to avoid spam
+                        current_time = time.time()
+                        if current_time - last_log_time >= 0.5 and total_size > 0:
+                            percentage = (downloaded / total_size) * 100
+                            size_mb = downloaded / (1024**2)
+                            total_mb = total_size / (1024**2)
+                            elapsed = current_time - start_time
+
+                            # Calculate speed
+                            speed_mbps = (downloaded / (1024**2)) / elapsed if elapsed > 0 else 0
+
+                            # Estimate time remaining
+                            if speed_mbps > 0:
+                                remaining_mb = total_mb - size_mb
+                                eta_seconds = remaining_mb / speed_mbps
+                                eta_str = self.format_time(eta_seconds)
+                            else:
+                                eta_str = "calculating..."
+
+                            ilog.info(
+                                f"  {percentage:6.1f}% | {size_mb:7.1f}/{total_mb:7.1f} MB | "
+                                f"{speed_mbps:6.1f} MB/s | ETA: {eta_str}"
+                            )
+                            last_log_time = current_time
+
+            elapsed = time.time() - start_time
+            speed_mbps = (downloaded / (1024**2)) / elapsed if elapsed > 0 else 0
+            ilog.info(f"✓ Downloaded {self.wheel} ({downloaded / (1024**2):.1f} MB in {self.format_time(elapsed)} at {speed_mbps:.1f} MB/s)")
+
+            return True
+
+        except requests.exceptions.RequestException as e:
+            ilog.error(f"Download failed: {str(e)}")
+            # Clean up partial file
+            filepath.unlink(missing_ok=True)
+            return False
+
+        except Exception as e:
+            ilog.critical(f"Unexpected error downloading {self.wheel}: {str(e)}")
+            filepath.unlink(missing_ok=True)
+            return False
+
+
+
+
+    # Usage example:
+    # success = download_wheel(
+    #     url="https://download.pytorch.org/whl/cu121/torch-2.0.0+cu121-cp311-cp311-linux_x86_64.whl",
+    #     cache_dir="./cache",
+    #     self.wheel="torch-2.0.0+cu121-cp311-cp311-linux_x86_64.whl"
+    # )

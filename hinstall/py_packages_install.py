@@ -164,6 +164,7 @@ def get_python_version(python_exe: Path | None = None) -> str:
         return f"{sys.version_info.major}.{sys.version_info.minor}"
 
 
+
 def update_pip(python_exe: Path | None = None) -> bool:
     python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
 
@@ -320,56 +321,4 @@ def get_pip_versions(python_exe: Path | None = None) -> dict[str, str]:
     #             download_install_py_package(package)
 
     #     return True
-
-
-
-
-
-
-
-# def download_install_py_package(
-#     package: PyPackage,
-#     retry: int = 3
-# ) -> bool:
-#     url: str = package.wheel_url
-#     temp_dir: Path = get_org_tempdir('herlegon')
-
-#     response: requests.Response
-#     try:
-#         response = requests.get(url, stream=True)
-#         response.raise_for_status()
-#     except requests.exceptions.RequestException as e:
-#         if str(e).startswith('404'):
-#             ilog.error(f"File {url} not found")
-#         return False
-
-#     # Use the external package download procedure
-#     ext_package = ExtPackage(
-#         name=package.pretty_name,
-#         filename=package.wheel,
-#         size=package.size,
-#         response=response,
-#         cache_file=temp_dir / "wheels" / package.wheel
-#     )
-
-#     # Download package
-#     if (
-#         ext_package.cache_file.is_file()
-#         and ext_package.cache_file.stat().st_size == ext_package.size
-#     ):
-#         ext_package.downloaded = True
-#         ilog.info(f"already downloaded")
-
-#     else:
-#         ext_package.download_from_host()
-
-#     pprint(ext_package)
-#     if not ext_package.downloaded:
-#         return False
-
-#     if not package.delayed_install:
-#         print("install non delayed")
-#         package.installed = install_py_package(package, ext_package)
-#         return package.installed
-#     return True
 
