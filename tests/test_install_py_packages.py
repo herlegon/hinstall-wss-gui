@@ -9,7 +9,7 @@ import time
 import tomllib
 from typing import Any
 
-from hytils import lightcyan, lightgreen, red
+from hytils import lightcyan, lightgreen, red, yellow
 from local_rehost import get_rehost_dir
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -122,7 +122,7 @@ if __name__ == "__main__":
                 print(f"    size: {pkg.size}")
 
 
-    if True:
+    if False:
         cpu_count = multiprocessing.cpu_count()
         cpu_count = max(cpu_count - 1, int(cpu_count * 4 / 5))
 
@@ -150,29 +150,42 @@ if __name__ == "__main__":
         ilog.info(f"updated in {elapsed:.02f}s")
 
 
-
-    uninstalled_packages = py_packages.get_initial().get_not_installed()
+    initial_packages = py_packages.get_initial()
+    uninstalled_packages = initial_packages.get_not_installed()
 
     python_exe = str(g_backend_dirs.python_exe)
     cache_dir = str(g_backend_dirs.cache)
     # Cache only the big packages
-    if False:
-        print(f"use cache: {cache_dir}")
-        subprocess.run([
-            python_exe,
-            '-m', 'pip', 'download',
-            '-d', cache_dir,
-            '--no-deps',
-            'psutil'
-        ])
+    print(f"Cache: {cache_dir}")
 
-    # Install package
-    if False:
-        subprocess.run([
-            python_exe,
-            '-m', 'pip', 'install',
-            '--find-links', cache_dir,
-            'psutil'
-        ])
+    for pkg in uninstalled_packages:
+        pkg: PyPackage
+        pkg.do_cache = True
 
+        # pkg.update_info()
+        # if pkg.installed:
+        #     continue
+        # pprint(pkg)
+
+        pnv = (
+            "==".join((pkg.name, pkg.version))
+            if pkg.version
+            else pkg.name
+        )
+        if pkg.do_cache:
+            cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps {pnv}"
+            try:
+                subprocess.run(
+                    cmd.split()
+                )
+            except Exception as e:
+                ilog.critical(f"failed to download wheel: {str(e)}")
+
+        cmd = f"{python_exe} -m pip install --find-links {cache_dir} {pnv}"
+        try:
+            subprocess.run(
+                cmd.split()
+            )
+        except Exception as e:
+            ilog.critical(f"failed to install package {pkg.name}: {str(e)}")
 

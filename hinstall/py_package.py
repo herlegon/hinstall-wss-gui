@@ -6,6 +6,8 @@ import subprocess
 import sys
 from urllib.parse import quote, unquote
 
+from hytils import lightgreen, red, yellow
+
 from .logger import ilog
 from .backend_dirs import g_backend_dirs
 from .py_packages_install import generate_backend_env
@@ -20,7 +22,7 @@ class PyPackage:
 
     # version to install, installed and latest from pypi
     version: str = ""
-    installed_version: str = ""
+    _installed_version: str = ""
     latest_version: str = ""
 
     extra_index_url: str = ""
@@ -46,6 +48,21 @@ class PyPackage:
         self._retry_count = count
 
 
+    @property
+    def installed_version(self) -> str:
+        return self._installed_version
+
+
+    @installed_version.setter
+    def installed_version(self, version: str) -> None:
+        self._installed_version = version
+        # Do not allow downgrading.
+        # if really needed, reinstall a new python package.
+        if self.is_downgrading():
+            self.version = self._installed_version
+            self.installed = True
+
+
     def uninstall(self) -> bool:
         ilog.debug(f"uninstall {self.name}")
         python_exe = str(g_backend_dirs.python_exe)
@@ -65,6 +82,29 @@ class PyPackage:
 
         ilog.debug(result_str)
         return True
+
+
+    def is_downgrading(self) -> bool:
+        if not self.version or not self.installed_version:
+            return False
+
+        def _parse_version(v: str):
+            """Turn '1.2.10' into [1, 2, 10]."""
+            return [int(x) for x in v.split(".")]
+
+        to_install = _parse_version(self.version)
+        current = _parse_version(self.installed_version)
+
+        # Extend lists to equal length (e.g., 1.2 vs 1.2.0)
+        length = max(len(current), len(to_install))
+        current.extend([0] * (length - len(current)))
+        to_install.extend([0] * (length - len(to_install)))
+
+        is_downgrading = current > to_install
+        if is_downgrading:
+            ilog.error(f"Downgrading is not permitted: {self.installed_version} -> {self.version}")
+        return is_downgrading
+
 
 
     def fetch_info_from_pypi(self) -> bool:

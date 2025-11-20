@@ -151,9 +151,10 @@ class PyPackages(list):
                         )
                     )
 
-        self.update_installed_versions()
         if keep_up_to_date:
             self.update_latest_versions()
+        self.update_installed_versions()
+
 
 
     def update_installed_versions(self) -> None:

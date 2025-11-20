@@ -143,22 +143,25 @@ def _generate_backend_env(exclude: list[str] | None = None) -> dict:
 
 
 def get_python_version(python_exe: Path | None = None) -> str:
-    # Run the python executable with the '-V' or '--version' flag to get the version
-    version: str = ""
+    if True:
+        # Get from subprocess to get the full version. Is this needed?
+        version: str = ""
 
-    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
-    try:
-        result = subprocess.run(
-            [python_exe, '--version'],
-            capture_output=True,
-            text=True,
-            env=g_backend_env
-        )
-        version = result.stdout.strip()
-    except:
-        pass
-    return version
+        python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
+        try:
+            result = subprocess.run(
+                [python_exe, '--version'],
+                capture_output=True,
+                text=True,
+                env=g_backend_env
+            )
+            version = result.stdout.strip()
+        except:
+            pass
+        return version
 
+    else:
+        return f"{sys.version_info.major}.{sys.version_info.minor}"
 
 
 def update_pip(python_exe: Path | None = None) -> bool:
