@@ -9,7 +9,7 @@ from hytils import lightcyan, lightgreen, red
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from hinstall import (
-    parse_packages_toml_,
+    parse_config_,
     ExtPackages,
     download_install_ext_packages,
     g_backend_dirs,
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     with open(config_fp, "rb") as f:
         data: dict[str, Any] = tomllib.load(f)
 
-    packages_cfg = parse_packages_toml_(data)
+    packages_cfg = parse_config_(data)
     external_packages = ExtPackages(packages_cfg, sys.platform)
 
     g_backend_dirs.local_host = get_rehost_dir()

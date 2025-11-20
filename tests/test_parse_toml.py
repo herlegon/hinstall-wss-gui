@@ -10,7 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from hinstall import (
     ilog,
     ExtPackages,
-    parse_packages_toml_,
+    parse_config_,
     PyPackages,
 )
 
@@ -28,7 +28,7 @@ if __name__ == "__main__":
         data: dict[str, Any] = tomllib.load(f)
 
     # load package toml cfg
-    packages_cfg = parse_packages_toml_(data)
+    packages_cfg = parse_config_(data)
 
     print(lightgreen(" ".join(("-" * 40, "config", "-" * 40))))
     pprint(packages_cfg)

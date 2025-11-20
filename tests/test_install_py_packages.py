@@ -14,7 +14,7 @@ from local_rehost import get_rehost_dir
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from hinstall import (
-    parse_packages_toml_,
+    parse_config_,
     ExtPackages,
     PyPackages,
     PyPackage,
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     with open(config_fp, "rb") as f:
         data: dict[str, Any] = tomllib.load(f)
 
-    packages_cfg = parse_packages_toml_(data)
+    packages_cfg = parse_config_(data)
 
     # Install python if not yest installed
     python_package = ExtPackages(packages_cfg, sys.platform).get_by_key('python')
@@ -122,6 +122,37 @@ if __name__ == "__main__":
                 print(f"    size: {pkg.size}")
 
 
+    if True:
+        cpu_count = multiprocessing.cpu_count()
+        cpu_count = max(cpu_count - 1, int(cpu_count * 4 / 5))
+
+
+        # uninstalled_packages = py_packages.get_initial().get_not_installed()
+        uninstalled_packages = py_packages.get_initial().get_not_installed()
+        pprint(uninstalled_packages)
+        start_time = time.time()
+        if False:
+            for pkg in uninstalled_packages:
+                pkg: PyPackage
+                pkg.update_info()
+        else:
+            with ThreadPoolExecutor(max_workers=min(cpu_count, len(uninstalled_packages))) as executor:
+                executor.map(lambda pkg: pkg.update_info(), uninstalled_packages)
+
+        elapsed = time.time() - start_time
+        for pkg in uninstalled_packages:
+            pkg: PyPackage
+            print(f"{pkg.name}:\n    latest version: {pkg.latest_version}\n    selected: {pkg.version}")
+            print(f"    variant: {pkg.variant}")
+            print(f"    wheel: {pkg.wheel}")
+            print(f"    wheel url: {pkg.wheel_url}")
+            print(f"    size: {pkg.size // 1024}kB")
+        ilog.info(f"updated in {elapsed:.02f}s")
+
+
+
+    uninstalled_packages = py_packages.get_initial().get_not_installed()
+
     python_exe = str(g_backend_dirs.python_exe)
     cache_dir = str(g_backend_dirs.cache)
     # Cache only the big packages
@@ -143,34 +174,5 @@ if __name__ == "__main__":
             '--find-links', cache_dir,
             'psutil'
         ])
-
-
-    if True:
-        cpu_count = multiprocessing.cpu_count()
-        cpu_count = max(cpu_count - 1, int(cpu_count * 4 / 5))
-
-
-        # uninstalled_packages = py_packages.get_initial().get_not_installed()
-        uninstalled_packages = py_packages.get_initial().get_not_installed()
-        start_time = time.time()
-        if False:
-            for pkg in uninstalled_packages:
-                pkg: PyPackage
-                pkg.update_info()
-        else:
-            with ThreadPoolExecutor(max_workers=min(cpu_count, len(uninstalled_packages))) as executor:
-                executor.map(lambda pkg: pkg.update_info(), uninstalled_packages)
-
-        elapsed = time.time() - start_time
-        for pkg in uninstalled_packages:
-            pkg: PyPackage
-            print(f"{pkg.name}:\n    latest version: {pkg.latest_version}\n    selected: {pkg.version}")
-            print(f"    variant: {pkg.variant}")
-            print(f"    wheel: {pkg.wheel}")
-            print(f"    wheel url: {pkg.wheel_url}")
-            print(f"    size: {pkg.size:.01f}MB")
-        ilog.info(f"updated in {elapsed:.02f}s")
-
-
 
 

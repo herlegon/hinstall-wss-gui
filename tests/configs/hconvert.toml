@@ -44,16 +44,15 @@ pypi = [
 # In python package, because critical or small
     "websockets",
     "hytils",
+
 # To upgrade
-#     "nvidia-ml-py",
-    "psutil",
-      "hsys",
-#     "opencv-python",
-#     "numpy",
-#     "timm",
-#     "onnx",
-#     "onnxruntime",
-#     "safetensors",
+    "hsys == 0.1.0",
+    # "nvidia-ml-py",
+    # "psutil",
+    # "hsys",
+    # "opencv-python",
+    # "numpy",
+    # "timm",
 #     "hytils",
 #     "backend",
 #     "pynnlib",
@@ -66,6 +65,16 @@ do_cache = true
 
 [py_packages.delayed.torch]
 uninstall_before = true
+
+
+# Safetensors
+[py_packages.delayed.safetensors]
+safetensors = "0.7.0"
+
+# Onnx
+[py_packages.delayed.onnx]
+onnx = "1.19.1"
+torchvision = "1.23.2"
 
 # PyTorch
 [py_packages.delayed.torch.cuda]

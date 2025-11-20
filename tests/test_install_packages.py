@@ -10,7 +10,7 @@ from local_rehost import get_rehost_dir
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from hinstall import (
-    parse_packages_toml_,
+    parse_config_,
     ExtPackages,
     g_backend_dirs,
     download_install_ext_packages,
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     with open(config_fp, "rb") as f:
         data: dict[str, Any] = tomllib.load(f)
 
-    packages_cfg = parse_packages_toml_(data)
+    packages_cfg = parse_config_(data)
     pprint(packages_cfg)
 
     external_packages = ExtPackages(packages_cfg, sys.platform)

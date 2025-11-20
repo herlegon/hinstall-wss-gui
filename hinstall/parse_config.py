@@ -4,7 +4,7 @@ from .utils import PLATFORMS
 
 
 
-def parse_packages_toml_(data: dict[str, Any]) -> dict[str, Any]:
+def parse_config_(data: dict[str, Any]) -> dict[str, Any]:
     for k_section in data.keys():
         section: dict[str, Any] = data[k_section]
 

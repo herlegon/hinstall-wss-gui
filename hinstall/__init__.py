@@ -15,8 +15,8 @@ from .ext_packages_install import (
     download_install_ext_packages,
 )
 
-from .parse_package_config import (
-    parse_packages_toml_,
+from .parse_config import (
+    parse_config_,
 )
 
 from .py_package import PyPackage
@@ -33,7 +33,7 @@ __all__ = [
     "ilog",
 
     "g_backend_dirs",
-    "parse_packages_toml_",
+    "parse_config_",
 
     "ExtPackage",
     "ExtPackages",

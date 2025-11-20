@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 from typing import Any, Literal
@@ -53,13 +54,23 @@ class PyPackages(list):
 
         # Process common packages: 1st pass
         common = platform_data.get('common', {})
+        pattern = re.compile(
+            r"^\s*([A-Za-z0-9_\-]+)\s*(==|>=|<=|>|<|!=)\s*([0-9a-zA-Z\.\-\+]+)\s*$"
+        )
         if 'pypi' in common:
             for pkg_name in common['pypi']:
+                version = ""
+                if match := pattern.match(pkg_name):
+                    pkg_name, op, version = match.groups()
+                    # use latest version if more than
+                    if ">" in op:
+                        version = ""
+
                 pretty_name = pretty_names.get(pkg_name, pkg_name)
                 self.append(PyPackage(
                     pretty_name=pretty_name,
                     name=pkg_name,
-                    version="",
+                    version=version,
                 ))
 
         # Process delayed packages

@@ -1,86 +1,14 @@
-
 from dataclasses import dataclass
-import json
-from pathlib import Path
 import platform
 from pprint import pprint
-import re
+import requests
 import subprocess
 import sys
-import time
-from typing import Any, Literal
 from urllib.parse import quote, unquote
 
-import requests
-
-from hinstall.py_packages_install import generate_backend_env
-from hytils import lightcyan, lightgreen, red, yellow
-
-from .backend_dirs import g_backend_dirs
 from .logger import ilog
-
-
-import sys
-import platform
-
-
-
-
-import subprocess
-import json
-import requests
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def select_wheel_for_env(wheels):
-    """
-    Pick the wheel matching current Python version and platform.
-    No external dependencies.
-    """
-    pyver = f"cp{sys.version_info.major}{sys.version_info.minor}"
-
-    system = platform.system().lower()
-    arch = platform.machine().lower()
-
-    # Normalize platform tags
-    if system == "windows":
-        plat_tag = "win_amd64" if arch in ("amd64", "x86_64") else arch
-    elif system == "linux":
-        # PyTorch Linux wheels usually use linux_x86_64 or manylinux
-        plat_tag = "linux"
-    elif system == "darwin":
-        plat_tag = "macosx"
-    else:
-        plat_tag = arch
-
-    for fname in wheels:
-        if pyver in fname.lower() and plat_tag in fname.lower():
-            return fname
-
-    print(red(f"no found for {pyver}, {plat_tag}"))
-    pprint(wheels)
-    return None
+from .backend_dirs import g_backend_dirs
+from .py_packages_install import generate_backend_env
 
 
 
@@ -144,45 +72,45 @@ class PyPackage:
             url = f"https://pypi.org/pypi/{self.name}/json"
             response = requests.get(url, timeout=5)
             if response.status_code != 200:
-                ilog.error(f"Package '{self.name}' not found on PyPI")
-                return False
-
-            data = response.json()
-            info = data['info']
-
-            # Update latest version
-            self.latest_version = info["version"]
-
-            # Update wheel
-            version = self.version if self.version else self.latest_version
-            if not version:
-                ilog.warning(f"no version")
-                return False
-
-            if 'torch' in self.name:
-                return True
-
-            # Pick first wheel file for that version
-            wheel_file = None
-            for f in data['releases'][version]:
-                if f['filename'].endswith('.whl'):
-                    wheel_file = f
-                    break
-
-            if not wheel_file:
-                ilog.warning(f"No wheel found for {self.name} {version}")
-                return False
-
-            self.wheel = wheel_file['filename']
-            self.wheel_url = wheel_file['url']
-            self.size = wheel_file['size'] / (1024**2)
-
-            return True
+                raise ValueError("package")
 
         except Exception as e:
-            ilog.error(f"Error fetching info for '{self.name}': {str(e)}")
+            raise ValueError("package")
 
-        return False
+        data = response.json()
+        info = data['info']
+
+        # Update latest version
+        self.latest_version = info["version"]
+
+        # Update wheel
+        version = self.version if self.version else self.latest_version
+        if not version:
+            ilog.warning(f"no version")
+            return False
+
+        if 'torch' in self.name:
+            return True
+
+        if version and version not in data['releases'].keys():
+            raise ValueError("version")
+
+        # Pick first wheel file for that version
+        wheel_file = None
+        for f in data['releases'][version]:
+            if f['filename'].endswith('.whl'):
+                wheel_file = f
+                break
+
+        if not wheel_file:
+            raise ValueError("wheel")
+
+        self.wheel = wheel_file['filename']
+        self.wheel_url = wheel_file['url']
+        self.size = wheel_file['size']
+
+        return True
+
 
 
     def get_wheel_size(self) -> None:
@@ -197,9 +125,7 @@ class PyPackage:
                 timeout=5
             )
             if response.status_code == 200:
-                size_bytes = int(response.headers.get("content-length", 0))
-                size_mb = size_bytes / (1024**2)
-                self.size = size_mb
+                self.size = int(response.headers.get("content-length", 0))
 
             else:
                 ilog.error(f"Failed to get wheel size, status code: {response.status_code}")
@@ -365,7 +291,24 @@ class PyPackage:
         #     return
 
         else:
-            self.fetch_info_from_pypi()
+            try:
+                self.fetch_info_from_pypi()
+
+            except Exception as e:
+                exception = str(e)
+                if 'version' in exception:
+                    # Version not found, use latest
+                    ilog.error(f"Version not found for {self.name}, use latest")
+                    self.version = ""
+                    self.update_info()
+
+                elif 'wheel' in exception:
+                    ilog.critical(f"Wheel not found for {self.name}")
+
+                elif 'package' in exception:
+                    ilog.critical(f"Package {self.name} not found on pypi")
+
+                return
 
 
     def _fast_pip_download(self) -> bool:
