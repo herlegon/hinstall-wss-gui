@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 import platform
 from pprint import pprint
+import re
+import sysconfig
 import time
 import requests
 import subprocess
@@ -12,6 +14,55 @@ from hytils import lightgreen, red, yellow
 from .logger import ilog
 from .backend_dirs import g_backend_dirs
 from .py_packages_install import generate_backend_env
+
+
+def get_platform_tag():
+    """Generate platform tag using only stdlib."""
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    if system == "windows":
+        if machine in ("amd64", "x86_64"):
+            plat = "win_amd64"
+        elif machine in ("x86", "i386", "i686"):
+            plat = "win32"
+        elif machine == "arm64":
+            plat = "win_arm64"
+        else:
+            plat = f"win_{machine}"
+
+    elif system == "darwin":
+        # macOS version
+        mac_ver = platform.mac_ver()[0]
+        if mac_ver:
+            parts = mac_ver.split('.')
+            mac_ver_str = f"{parts[0]}_{parts[1] if len(parts) > 1 else '0'}"
+        else:
+            mac_ver_str = "10_9"  # fallback
+
+        if machine == "arm64":
+            plat = f"macosx_{mac_ver_str}_arm64"
+        elif machine in ("x86_64", "amd64"):
+            plat = f"macosx_{mac_ver_str}_x86_64"
+        else:
+            plat = f"macosx_{mac_ver_str}_{machine}"
+
+    elif system == "linux":
+        if machine in ("x86_64", "amd64"):
+            arch = "x86_64"
+        elif machine in ("aarch64", "arm64"):
+            arch = "aarch64"
+        elif machine in ("i386", "i686"):
+            arch = "i686"
+        else:
+            arch = machine
+
+        plat = f"manylinux2014_{arch}"
+
+    else:
+        plat = sysconfig.get_platform().replace('-', '_').replace('.', '_')
+
+    return plat
 
 
 
@@ -107,6 +158,12 @@ class PyPackage:
         return is_downgrading
 
 
+    def _update_wheel_info(self, wheel_file: dict) -> None:
+        self.wheel = wheel_file['filename']
+        self.wheel_url = wheel_file['url']
+        self.size = wheel_file['size']
+
+
 
     def fetch_info_from_pypi(self) -> bool:
         try:
@@ -120,6 +177,7 @@ class PyPackage:
 
         data = response.json()
         info = data['info']
+        # pprint(info)
 
         # Update latest version
         self.latest_version = info["version"]
@@ -128,28 +186,91 @@ class PyPackage:
         version = self.version if self.version else self.latest_version
         if not version:
             ilog.warning(f"no version")
+            raise
             return False
 
         if 'torch' in self.name:
+            raise
             return True
 
         if version and version not in data['releases'].keys():
             raise ValueError("version")
 
-        # Pick first wheel file for that version
-        wheel_file = None
-        for f in data['releases'][version]:
-            if f['filename'].endswith('.whl'):
-                wheel_file = f
-                break
+        # Get platform-specific details
+        platform_tag: str = get_platform_tag()
 
-        if not wheel_file:
+        # Look for a wheel file that matches the platform, Python version, and architecture
+        files = []
+        for f in data['releases'][version]:
+            filename: str = f['filename']
+            if (
+                filename.endswith('.whl')
+                and (
+                    platform_tag in filename or "-any" in filename
+                )
+            ):
+                files.append(f)
+
+        if not files:
+            pprint(data['releases'][version])
             raise ValueError("wheel")
 
-        self.wheel = wheel_file['filename']
-        self.wheel_url = wheel_file['url']
-        self.size = wheel_file['size']
+        if len(files) == 1:
+            self._update_wheel_info(files[0])
+            return True
 
+        # Find the minimum python version
+        py_prefix = list(set([f['python_version'][:2] for f in files]))
+
+        if "cp" in py_prefix:
+            py_versions = sorted(
+                list(set([
+                    int(f['python_version'][2:])
+                    for f in files
+                    if f['python_version'][:2] == 'cp'
+                ]))
+            )
+        elif "py" in py_prefix:
+            py_versions = set()
+            version_pattern = r'cp(\d{3})'
+            for f in files:
+                versions = re.findall(version_pattern, f['filename'])
+                py_versions.update(versions)
+            py_versions = sorted(list(map(int, py_versions)))
+
+        else:
+            ilog.error(f"py_prefix not supported")
+            raise ValueError("wheel")
+
+        current_version = sys.version_info.major * 100 + sys.version_info.minor
+        if current_version in py_versions:
+            highest_supported_version = current_version
+
+        elif len(py_versions) == 1:
+            if current_version != py_versions[0]:
+                ilog.error(f"{self.name} only a single version found")
+                raise ValueError("wheel")
+        else:
+            highest_supported_version = None
+            for v in py_versions:
+                if v <= current_version:
+                    highest_supported_version = v
+            if not highest_supported_version:
+                raise ValueError("wheel")
+        version_filter = f"cp{highest_supported_version}"
+        files = [f for f in files if version_filter in f['filename']]
+
+
+        if len(files) == 1:
+            self._update_wheel_info(files[0])
+            return True
+
+
+        print(red(f"{self.name} No compatible wheel file found"))
+        pprint(self)
+        pprint(files)
+        pprint(data['releases'][version])
+        raise ValueError(f"{self.name} No compatible wheel file found")
         return True
 
 
@@ -205,7 +326,7 @@ class PyPackage:
             else:
                 arch = "unknown"
 
-            arch = "win_amd64"
+            # arch = "win_amd64"
             # Step 4: Construct wheel filename
             self.wheel = f"{self.name}-{version}-cp{python_version}-cp{python_version}-{arch}.whl"
 
@@ -428,16 +549,16 @@ class PyPackage:
             True if successful, False otherwise
         """
         g_backend_dirs.cache.mkdir(parents=True, exist_ok=True)
-        filepath = g_backend_dirs.cache / self.wheel
+        wheel_fp = g_backend_dirs.cache / self.wheel
 
         pprint(self)
-        print(red(filepath))
+        print(red(wheel_fp))
 
         if not self.wheel_url:
             ilog.error(f"cannot download with request, TODO use pip as a fallback")
 
         try:
-            ilog.info(f"Downloading {self.wheel}...")
+            ilog.info(f"Get wheel info...")
 
             response = requests.get(
                 self.wheel_url,
@@ -452,11 +573,16 @@ class PyPackage:
             if total_size == 0:
                 ilog.warning(f"Unknown file size for {self.wheel}")
 
+            if wheel_fp.is_file() and wheel_fp.stat().st_size == total_size:
+                ilog.info(f"{self.wheel} File was already downloaded")
+                return True
+
+            ilog.info(f"Downloading {self.wheel}...")
             downloaded = 0
             start_time = time.time()
             last_log_time = start_time
 
-            with open(filepath, 'wb') as f:
+            with open(wheel_fp, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
                     if chunk:
                         f.write(chunk)
@@ -496,12 +622,12 @@ class PyPackage:
         except requests.exceptions.RequestException as e:
             ilog.error(f"Download failed: {str(e)}")
             # Clean up partial file
-            filepath.unlink(missing_ok=True)
+            wheel_fp.unlink(missing_ok=True)
             return False
 
         except Exception as e:
             ilog.critical(f"Unexpected error downloading {self.wheel}: {str(e)}")
-            filepath.unlink(missing_ok=True)
+            wheel_fp.unlink(missing_ok=True)
             return False
 
 

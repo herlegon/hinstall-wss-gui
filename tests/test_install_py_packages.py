@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
+import os
 from pathlib import Path
 from pprint import pprint
 import re
@@ -125,25 +126,26 @@ if __name__ == "__main__":
                 print(f"    size: {pkg.size}")
 
 
-    if False:
+    initial_packages = py_packages.get_initial()
+    uninstalled_packages = initial_packages.get_not_installed()
+
+    if True:
         cpu_count = multiprocessing.cpu_count()
         cpu_count = max(cpu_count - 1, int(cpu_count * 4 / 5))
 
 
-        # uninstalled_packages = py_packages.get_initial().get_not_installed()
-        uninstalled_packages = py_packages.get_initial().get_not_installed()
-        pprint(uninstalled_packages)
+        selected_pkgs = initial_packages
         start_time = time.time()
         if False:
-            for pkg in uninstalled_packages:
+            for pkg in selected_pkgs:
                 pkg: PyPackage
                 pkg.update_info()
         else:
-            with ThreadPoolExecutor(max_workers=min(cpu_count, len(uninstalled_packages))) as executor:
-                executor.map(lambda pkg: pkg.update_info(), uninstalled_packages)
+            with ThreadPoolExecutor(max_workers=min(cpu_count, len(selected_pkgs))) as executor:
+                executor.map(lambda pkg: pkg.update_info(), selected_pkgs)
 
         elapsed = time.time() - start_time
-        for pkg in uninstalled_packages:
+        for pkg in selected_pkgs:
             pkg: PyPackage
             print(f"{pkg.name}:\n    latest version: {pkg.latest_version}\n    selected: {pkg.version}")
             print(f"    variant: {pkg.variant}")
@@ -152,17 +154,16 @@ if __name__ == "__main__":
             print(f"    size: {pkg.size // 1024}kB")
         ilog.info(f"updated in {elapsed:.02f}s")
 
+        # sys.exit()
 
-    initial_packages = py_packages.get_initial()
-    uninstalled_packages = initial_packages.get_not_installed()
 
     python_exe = str(g_backend_dirs.python_exe)
     cache_dir = str(g_backend_dirs.cache)
     # Cache only the big packages
     print(f"Cache: {cache_dir}")
-    print("Packages to install", lightcyan(", ".join((pkg.name for pkg in uninstalled_packages))))
+    print("Packages to install", lightcyan(", ".join((pkg.name for pkg in selected_pkgs))))
 
-    for pkg in initial_packages:
+    for pkg in py_packages.get_delayed():
         pkg: PyPackage
         pkg.do_cache = True
 
@@ -175,24 +176,29 @@ if __name__ == "__main__":
             if pkg.version
             else pkg.name
         )
-        if pkg.name !=  "opencv-python":
+        # if pkg.name !=  "opencv-python":
+        # if pkg.name !=  "torch" and "cu" not in pkg.version:
+        #     continue
+
+        if pkg.name != "tensorrt":
             continue
 
-        if pkg.do_cache:
-            # cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps {pnv}"
-            # try:
-            #     subprocess.run(
-            #         cmd.split()
-            #     )
-            # except Exception as e:
-            #     ilog.critical(f"failed to download wheel: {str(e)}")
-
+        if pkg.do_cache and pkg.name != "tensorrt":
             start_time = time.time()
 
-
             if True:
+                cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps {pnv}"
+                if pkg.extra_index_url:
+                    cmd = f"{cmd} --index-url={pkg.extra_index_url}"
+                print(yellow(cmd))
+                try:
+                    subprocess.run(cmd.split())
+                except Exception as e:
+                    ilog.critical(f"failed to download wheel: {str(e)}")
+
+            elif False:
                 print(red("download"))
-                cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps --no-cache-dir {pnv}"
+                cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps {pnv}"
                 # try:
                 process = subprocess.Popen(
                     cmd.split(),
@@ -219,8 +225,8 @@ if __name__ == "__main__":
                             break
                     #     else:
                     #         print(line)
-                    # else:
-                    #     print(line)
+                    else:
+                        print(line)
 
                 if not wheel:
                     print(output_lines)
@@ -263,32 +269,35 @@ if __name__ == "__main__":
                 print(red("END "))
 
             else:
-                pkg.update_info()
-                pkg.download_wheel()
+                # torch-2.9.1+cu130-cp312-cp312-win_amd64.whl
+                #   24s
+
+                # pkg.update_info()
+                wheel_fp: Path = g_backend_dirs.cache / pkg.wheel
+                if wheel_fp.is_file():
+                    print(lightgreen(f"Already downloaded {wheel_fp}"))
+                else:
+                    print(red(f"error: wheel file {wheel_fp} shall exist before"))
+
+                # pkg.download_wheel()
+
             elapsed = time.time() - start_time
-            ilog.info(f"downloaded in {elapsed:.02f}s")
+            ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
+            # break
 
-
-
-
-    def download_wheel_with_file_monitoring(self) -> bool:
-        """Download with pip while monitoring file growth for progress"""
-        g_backend_dirs.cache.mkdir(parents=True, exist_ok=True)
-        filepath = g_backend_dirs.cache / self.wheel
-
-        # Start pip download in background
-        cmd = [python_exe, '-m', 'pip', 'download', '-d', cache_dir, '--no-deps', pnv]
-
-
-
-
-        # cmd = f"{python_exe} -m pip install --find-links {cache_dir} {pnv}"
-        # try:
-        #     subprocess.run(
-        #         cmd.split()
-        #     )
-        # except Exception as e:
-        #     ilog.critical(f"failed to install package {pkg.name}: {str(e)}")
+        if pkg.name == "tensorrt":
+            cmd = f"{python_exe} -m pip install --find-links {cache_dir} {pnv}"
+            pprint(os.environ)
+            print(yellow(cmd))
+            pprint(backend_env)
+            backend_env = generate_backend_env()
+            try:
+                subprocess.run(
+                    cmd.split(),
+                    env=backend_env,
+                )
+            except Exception as e:
+                ilog.critical(f"failed to install package {pkg.name}: {str(e)}")
 
 
     # for pkg in initial_packages:

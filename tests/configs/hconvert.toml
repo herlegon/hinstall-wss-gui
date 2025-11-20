@@ -44,15 +44,17 @@ pypi = [
 # In python package, because critical or small
     # "websockets",
     # "hytils",
+    "setuptools",
+    "wheel",
 
 # Upgradable
-    "hytils",
+    # "hytils",
     "psutil",
     "nvidia-ml-py",
     "hsys",
     "opencv-python",
-    # "numpy",
-    # "timm",
+    "numpy",
+    "timm",
 #     "backend",
 #     "pynnlib",
 ]
@@ -73,7 +75,7 @@ safetensors = "0.7.0"
 # Onnx
 [py_packages.delayed.onnx]
 onnx = "1.19.1"
-torchvision = "1.23.2"
+onnxruntime = "1.23.2"
 
 # PyTorch
 [py_packages.delayed.torch.cuda]
@@ -93,18 +95,27 @@ torchvision = "0.24.0+rocm6.4"
 
 # Nvidia TensorRT
 [py_packages.delayed.tensorrt]
-extra-index-url = "https://py_packages.nvidia.com"
+# extra-index-url = "https://pypi.org/simple"
+index-url = "https://pypi.nvidia.com"
+# https://pypi.nvidia.com
+# Cannot download with requests because build from source
 tensorrt = "10.14.1.48.post1"
-# 'tensorrt_cu13_libs': (),
-# 'tensorrt_cu13_bindings': (),
-# 'tensorrt_cu13': (),
-# 'tensorrt': (),
 
+# tensorrt_cu13_libs==10.14.1.48.post1 (from tensorrt_cu13==10.14.1.48.post1->tensorrt)
+#   Downloading https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.14.1.48.post1-py2.py3-none-win_amd64.whl (1628.8 MB)
+# https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.14.1.48-py2.py3-none-win_amd64.whl
+# https://pypi.nvidia.com
+# https://pypi.nvidia.com/nvidia-cuda-runtime/
+
+# tensorrt               10.14.1.48.post1
+# tensorrt_cu13          10.14.1.48.post1
+# tensorrt_cu13_bindings 10.14.1.48.post1
+# tensorrt_cu13_libs     10.14.1.48.post1
+# nvidia-cuda-runtime   13.0.88
 
 # DirectML
 [py_packages.delayed.directml]
 onnxruntime-directml = "1.23.0"
-
 
 
 # Other

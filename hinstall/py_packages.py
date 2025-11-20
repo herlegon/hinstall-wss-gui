@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
 import json
+import multiprocessing
 from pathlib import Path
 import re
 import subprocess
@@ -189,9 +191,10 @@ class PyPackages(list):
 
 
     def update_latest_versions(self) -> None:
-        for pkg in self:
-            pkg: PyPackage
-            pkg.update_info()
+        cpu_count = multiprocessing.cpu_count()
+        cpu_count = max(cpu_count - 1, int(cpu_count * 4 / 5))
+        with ThreadPoolExecutor(max_workers=min(cpu_count, len(self))) as executor:
+            executor.map(lambda pkg: pkg.update_info(), self)
 
 
     def get_initial(self) -> 'PyPackages':
