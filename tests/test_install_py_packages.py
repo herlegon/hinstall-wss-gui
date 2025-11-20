@@ -1,7 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
 from pathlib import Path
 from pprint import pprint
 import signal
+import subprocess
 import sys
+import time
 import tomllib
 from typing import Any
 
@@ -68,30 +72,105 @@ if __name__ == "__main__":
         sys.platform,
         keep_up_to_date=keep_up_to_date
     )
-    py_packages = py_packages.get_initial()
 
+    # Display the package sthat have to be installed first
+    if False:
+        py_packages = py_packages.get_initial()
+
+    # Python version
     print(get_python_version())
 
-    uninstalled_packages = py_packages.get_not_installed()
-
-    # print("uninstalled")
-    # pprint(uninstalled_packages)
+    # List uninstalled python packages
+    if False:
+        uninstalled_packages = py_packages.get_not_installed()
+        print("uninstalled")
+        pprint(uninstalled_packages)
 
     # get_pypackage_list()
-
     # update_package_info(py_packages[0])
 
-    # installed_versions = get_pip_versions()
-
-    for pkg in uninstalled_packages:
-        pkg: PyPackage
-        pkg.update_wheel_url()
-
-    pprint(uninstalled_packages)
+    # For testing purpose: get the current installed versions
+    if False:
+        installed_versions = get_pip_versions()
 
 
-    # install_py_packages(
-    #     python_exe=python_exe,
-    #     packages=py_packages(),
-    #     threads=4
-    # )
+    # Update wheels
+    if False:
+        uninstalled_packages = py_packages.get_delayed().get_not_installed()
+        pprint(f"get wheel url")
+        for pkg in uninstalled_packages:
+            pkg: PyPackage
+            pkg.update_wheel_url()
+        pprint(uninstalled_packages)
+
+    if False:
+        # uninstalled_packages = py_packages.get_initial().get_not_installed()
+        uninstalled_packages = py_packages.get_not_installed()
+        for pkg in uninstalled_packages:
+            pkg: PyPackage
+            if (
+                pkg.variant in 'cuda'
+                or pkg.name == 'tensorrt'
+                or not pkg.delayed_install
+            ):
+                pkg.fetch_latest_version()
+                print(f"{pkg.name}:\n    latest version: {pkg.latest_version}\n    selected: {pkg.version}")
+                print(f"    variant: {pkg.variant}")
+                start_time = time.time()
+                pkg.update_info()
+                print(f"    wheel: {pkg.wheel}")
+                print(f"    size: {pkg.size}")
+
+
+    python_exe = str(g_backend_dirs.python_exe)
+    cache_dir = str(g_backend_dirs.cache)
+    # Cache only the big packages
+    if False:
+        print(f"use cache: {cache_dir}")
+        subprocess.run([
+            python_exe,
+            '-m', 'pip', 'download',
+            '-d', cache_dir,
+            '--no-deps',
+            'psutil'
+        ])
+
+    # Install package
+    if False:
+        subprocess.run([
+            python_exe,
+            '-m', 'pip', 'install',
+            '--find-links', cache_dir,
+            'psutil'
+        ])
+
+
+    if True:
+        cpu_count = multiprocessing.cpu_count()
+        cpu_count = max(cpu_count - 1, int(cpu_count * 4 / 5))
+
+
+        # uninstalled_packages = py_packages.get_initial().get_not_installed()
+        uninstalled_packages = py_packages.get_initial().get_not_installed()
+        start_time = time.time()
+        if False:
+            for pkg in uninstalled_packages:
+                pkg: PyPackage
+                pkg.update_info()
+        else:
+            with ThreadPoolExecutor(max_workers=min(cpu_count, len(uninstalled_packages))) as executor:
+                executor.map(lambda pkg: pkg.update_info(), uninstalled_packages)
+
+        elapsed = time.time() - start_time
+        for pkg in uninstalled_packages:
+            pkg: PyPackage
+            print(f"{pkg.name}:\n    latest version: {pkg.latest_version}\n    selected: {pkg.version}")
+            print(f"    variant: {pkg.variant}")
+            print(f"    wheel: {pkg.wheel}")
+            print(f"    wheel url: {pkg.wheel_url}")
+            print(f"    size: {pkg.size:.01f}MB")
+        ilog.info(f"updated in {elapsed:.02f}s")
+
+
+
+

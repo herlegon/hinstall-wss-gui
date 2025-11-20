@@ -11,10 +11,10 @@ import sys
 import time
 from urllib.parse import unquote
 
-import requests
-from .ext_packages import ExtPackage
+# import requests
+# from .ext_packages import ExtPackage
 
-from .py_packages import PyPackage
+# from .py_packages import PyPackage
 from .logger import ilog
 from .backend_dirs import g_backend_dirs
 
@@ -255,118 +255,118 @@ def get_pip_versions(python_exe: Path | None = None) -> dict[str, str]:
 
 
 
-    def install_py_packages(
-        packages: tuple[PyPackage],
-        retry: int = 3,
-        threads: int = 1,
-    ) -> bool:
-        threads = min(max(threads, 1), len(packages))
+    # def install_py_packages(
+    #     packages: tuple[PyPackage],
+    #     retry: int = 3,
+    #     threads: int = 1,
+    # ) -> bool:
+    #     threads = min(max(threads, 1), len(packages))
 
-        def _get_info(package: PyPackage) -> None:
-            update_package_info(package)
-            update_package_url(package)
-            ilog.debug(f"{package.pretty_name}: {package.url}")
-            if package.supported:
-                if not package.is_installed():
-                    ilog.info(orange(
-                        f"{package.pretty_name} has to be updated: "
-                        + f"{package.installed_version} -> {package.version}"
-                    ))
-                else:
-                    ilog.info(lightgreen(
-                        f"{package.pretty_name} is already installed: {package.version}"
-                    ))
-
-
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            executor.map(_get_info, packages)
+    #     def _get_info(package: PyPackage) -> None:
+    #         update_package_info(package)
+    #         update_package_url(package)
+    #         ilog.debug(f"{package.pretty_name}: {package.url}")
+    #         if package.supported:
+    #             if not package.is_installed():
+    #                 ilog.info(orange(
+    #                     f"{package.pretty_name} has to be updated: "
+    #                     + f"{package.installed_version} -> {package.version}"
+    #                 ))
+    #             else:
+    #                 ilog.info(lightgreen(
+    #                     f"{package.pretty_name} is already installed: {package.version}"
+    #                 ))
 
 
-        packages = [package for package in packages if not package.is_installed()]
-        pprint(packages)
-        if not packages:
-            ilog.info(f"No packages to update")
-            return True
-
-        success: bool = True
-        if threads == 1:
-            for package in packages:
-                success = download_install_py_package(
-                    package,
-                    retry=retry
-                )
-                if not success:
-                    break
-
-        else:
-            with ThreadPoolExecutor(max_workers=threads) as executor:
-                for result in executor.map(
-                    lambda args: download_install_py_package(*args),
-                    [(package, retry) for package in packages]
-                ):
-                    success = success and result
-
-        if not success:
-            return False
-
-        # Install remaining packages
-        print("remaining packages")
-        for package in packages:
-            if package.delayed_install and not package.installed:
-                package.delayed_install = False
-                download_install_py_package(package)
-
-        return True
+    #     with ThreadPoolExecutor(max_workers=8) as executor:
+    #         executor.map(_get_info, packages)
 
 
+    #     packages = [package for package in packages if not package.is_installed()]
+    #     pprint(packages)
+    #     if not packages:
+    #         ilog.info(f"No packages to update")
+    #         return True
+
+    #     success: bool = True
+    #     if threads == 1:
+    #         for package in packages:
+    #             success = download_install_py_package(
+    #                 package,
+    #                 retry=retry
+    #             )
+    #             if not success:
+    #                 break
+
+    #     else:
+    #         with ThreadPoolExecutor(max_workers=threads) as executor:
+    #             for result in executor.map(
+    #                 lambda args: download_install_py_package(*args),
+    #                 [(package, retry) for package in packages]
+    #             ):
+    #                 success = success and result
+
+    #     if not success:
+    #         return False
+
+    #     # Install remaining packages
+    #     print("remaining packages")
+    #     for package in packages:
+    #         if package.delayed_install and not package.installed:
+    #             package.delayed_install = False
+    #             download_install_py_package(package)
+
+    #     return True
 
 
 
 
 
-def download_install_py_package(
-    package: PyPackage,
-    retry: int = 3
-) -> bool:
-    url: str = package.url
-    temp_dir: Path = get_org_tempdir('herlegon')
 
-    response: requests.Response
-    try:
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        if str(e).startswith('404'):
-            ilog.error(f"File {url} not found")
-        return False
 
-    # Use the external package download procedure
-    ext_package = ExtPackage(
-        name=package.pretty_name,
-        filename=package.wheel,
-        size=package.size,
-        response=response,
-        cache_file=temp_dir / "wheels" / package.wheel
-    )
+# def download_install_py_package(
+#     package: PyPackage,
+#     retry: int = 3
+# ) -> bool:
+#     url: str = package.wheel_url
+#     temp_dir: Path = get_org_tempdir('herlegon')
 
-    # Download package
-    if (
-        ext_package.cache_file.is_file()
-        and ext_package.cache_file.stat().st_size == ext_package.size
-    ):
-        ext_package.downloaded = True
-        ilog.info(f"already downloaded")
+#     response: requests.Response
+#     try:
+#         response = requests.get(url, stream=True)
+#         response.raise_for_status()
+#     except requests.exceptions.RequestException as e:
+#         if str(e).startswith('404'):
+#             ilog.error(f"File {url} not found")
+#         return False
 
-    else:
-        ext_package.download_from_host()
+#     # Use the external package download procedure
+#     ext_package = ExtPackage(
+#         name=package.pretty_name,
+#         filename=package.wheel,
+#         size=package.size,
+#         response=response,
+#         cache_file=temp_dir / "wheels" / package.wheel
+#     )
 
-    pprint(ext_package)
-    if not ext_package.downloaded:
-        return False
+#     # Download package
+#     if (
+#         ext_package.cache_file.is_file()
+#         and ext_package.cache_file.stat().st_size == ext_package.size
+#     ):
+#         ext_package.downloaded = True
+#         ilog.info(f"already downloaded")
 
-    if not package.delayed_install:
-        print("install non delayed")
-        package.installed = install_py_package(package, ext_package)
-        return package.installed
-    return True
+#     else:
+#         ext_package.download_from_host()
+
+#     pprint(ext_package)
+#     if not ext_package.downloaded:
+#         return False
+
+#     if not package.delayed_install:
+#         print("install non delayed")
+#         package.installed = install_py_package(package, ext_package)
+#         return package.installed
+#     return True
 

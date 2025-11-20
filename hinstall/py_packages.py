@@ -179,7 +179,7 @@ class PyPackages(list):
     def update_latest_versions(self) -> None:
         for pkg in self:
             pkg: PyPackage
-            pkg.get_latest_version()
+            pkg.update_info()
 
 
     def get_initial(self) -> 'PyPackages':

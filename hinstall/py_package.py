@@ -9,14 +9,78 @@ import subprocess
 import sys
 import time
 from typing import Any, Literal
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 import requests
 
+from hinstall.py_packages_install import generate_backend_env
 from hytils import lightcyan, lightgreen, red, yellow
 
 from .backend_dirs import g_backend_dirs
 from .logger import ilog
+
+
+import sys
+import platform
+
+
+
+
+import subprocess
+import json
+import requests
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def select_wheel_for_env(wheels):
+    """
+    Pick the wheel matching current Python version and platform.
+    No external dependencies.
+    """
+    pyver = f"cp{sys.version_info.major}{sys.version_info.minor}"
+
+    system = platform.system().lower()
+    arch = platform.machine().lower()
+
+    # Normalize platform tags
+    if system == "windows":
+        plat_tag = "win_amd64" if arch in ("amd64", "x86_64") else arch
+    elif system == "linux":
+        # PyTorch Linux wheels usually use linux_x86_64 or manylinux
+        plat_tag = "linux"
+    elif system == "darwin":
+        plat_tag = "macosx"
+    else:
+        plat_tag = arch
+
+    for fname in wheels:
+        if pyver in fname.lower() and plat_tag in fname.lower():
+            return fname
+
+    print(red(f"no found for {pyver}, {plat_tag}"))
+    pprint(wheels)
+    return None
 
 
 
@@ -33,7 +97,7 @@ class PyPackage:
 
     extra_index_url: str = ""
     wheel: str = ""
-    url: str = ""
+    wheel_url: str = ""
     size: int = 0
     supported: bool = True
     installed: bool = False
@@ -52,17 +116,6 @@ class PyPackage:
     @retry_count.setter
     def retry_count(self, count: int) -> None:
         self._retry_count = count
-
-
-    def get_latest_version(self):
-        # ilog.debug(f"[{self.name}]: get version")
-        url = f"https://pypi.org/pypi/{self.name}/json"
-        r = requests.get(url)
-        if r.status_code != 200:
-            ilog.debug(f"[{self.name}]: Failed to get version")
-            return
-        data = r.json()
-        self.latest_version = data["info"]["version"]
 
 
     def uninstall(self) -> bool:
@@ -86,87 +139,234 @@ class PyPackage:
         return True
 
 
-
-    def update_wheel_url(self) -> bool:
-        """Fast method using PyPI API with simple compatibility check."""
-        python_exe = str(g_backend_dirs.python_exe)
-
-        # Check if installed
-        if subprocess.run([python_exe, "-m", "pip", "show", self.name],
-                        capture_output=True).returncode == 0:
-            self.installed = True
-            ilog.info(f"{self.pretty_name} already installed")
-            return True
-
-        # For custom index, use pip
-        if self.extra_index_url and 'pypi.org' not in self.extra_index_url:
-            return self._fast_pip_download()
-
+    def fetch_info_from_pypi(self) -> bool:
         try:
-            # Get from PyPI
-            import requests
             url = f"https://pypi.org/pypi/{self.name}/json"
-            resp = requests.get(url, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-
-            target_version = self.version if self.version else data['info']['version']
-
-            if target_version not in data['releases']:
-                ilog.error(f"Version {target_version} not found")
+            response = requests.get(url, timeout=5)
+            if response.status_code != 200:
+                ilog.error(f"Package '{self.name}' not found on PyPI")
                 return False
 
-            # Get system info for compatibility
-            py_version = f"cp{sys.version_info.major}{sys.version_info.minor}"
-            system = platform.system().lower()
-            machine = platform.machine().lower()
+            data = response.json()
+            info = data['info']
 
-            # Map machine to wheel tags
-            if 'amd64' in machine or 'x86_64' in machine:
-                arch = 'amd64' if system == 'windows' else 'x86_64'
-            elif 'arm64' in machine or 'aarch64' in machine:
-                arch = 'arm64'
+            # Update latest version
+            self.latest_version = info["version"]
+
+            # Update wheel
+            version = self.version if self.version else self.latest_version
+            if not version:
+                ilog.warning(f"no version")
+                return False
+
+            if 'torch' in self.name:
+                return True
+
+            # Pick first wheel file for that version
+            wheel_file = None
+            for f in data['releases'][version]:
+                if f['filename'].endswith('.whl'):
+                    wheel_file = f
+                    break
+
+            if not wheel_file:
+                ilog.warning(f"No wheel found for {self.name} {version}")
+                return False
+
+            self.wheel = wheel_file['filename']
+            self.wheel_url = wheel_file['url']
+            self.size = wheel_file['size'] / (1024**2)
+
+            return True
+
+        except Exception as e:
+            ilog.error(f"Error fetching info for '{self.name}': {str(e)}")
+
+        return False
+
+
+    def get_wheel_size(self) -> None:
+        if not self.wheel_url:
+            return
+        self.size = 0
+        try:
+            # HEAD request avoids downloading the file
+            response = requests.head(
+                self.wheel_url,
+                allow_redirects=True,
+                timeout=5
+            )
+            if response.status_code == 200:
+                size_bytes = int(response.headers.get("content-length", 0))
+                size_mb = size_bytes / (1024**2)
+                self.size = size_mb
+
             else:
-                arch = machine
+                ilog.error(f"Failed to get wheel size, status code: {response.status_code}")
 
-            # Look for compatible wheel
-            releases = data['releases'][target_version]
+        except Exception as e:
+            ilog.error(f"exception while getting size: {str(e)}")
 
-            # Try to find best match
-            for file_info in releases:
-                if file_info['packagetype'] == 'bdist_wheel':
-                    wheel_name = file_info['filename']
 
-                    # Check if wheel is compatible (simple heuristic)
-                    if (py_version in wheel_name and
-                        (arch in wheel_name.lower() or 'any' in wheel_name)):
+    def resolve_torch_wheel(self):
+        """
+        Determine the correct PyTorch wheel URL and size.
+        If version is not set, use latest PyTorch version from PyPI.
+        Handles URL encoding for '+' in wheel filenames.
+        """
+        try:
+            # Step 1: Use latest version if none specified
+            version = self.version if self.version else self.latest_version
+            if not version:
+                self.fetch_latest_version()
+                version = self.version if self.version else self.latest_version
+            if not version:
+                ilog.error("No PyTorch version specified or found")
+                return
 
-                        self.url = file_info['url']
-                        self.wheel = wheel_name
-                        self.version = target_version
-                        self.size = file_info['size']
-                        ilog.info(f"Found {self.pretty_name}: {self.wheel}")
-                        return True
+            # Step 2: Python version
+            python_version = f"{sys.version_info.major}{sys.version_info.minor}"
 
-            # Try universal wheels
-            for file_info in releases:
-                if file_info['packagetype'] == 'bdist_wheel':
-                    wheel_name = file_info['filename']
-                    if 'py3-none-any' in wheel_name or 'py2.py3-none-any' in wheel_name:
-                        self.url = file_info['url']
-                        self.wheel = wheel_name
-                        self.version = target_version
-                        self.size = file_info['size']
-                        ilog.info(f"Found {self.pretty_name}: {self.wheel}")
-                        return True
+            # Step 3: Detect architecture
+            sys_platform = sys.platform
+            if sys_platform.startswith("win"):
+                arch = "win_amd64" if platform.architecture()[0] == "64bit" else "win32"
+            elif sys_platform == "darwin":
+                arch = "arm64" if platform.machine() == "arm64" else "x86_64"
+            elif sys_platform.startswith("linux"):
+                arch = "manylinux_2_28_x86_64"  # default Linux x86_64
+            else:
+                arch = "unknown"
 
-            ilog.warning(f"No compatible wheel found for {self.name}")
-            self.supported = False
+            arch = "win_amd64"
+            # Step 4: Construct wheel filename
+            wheel_name = f"{self.name}-{version}-cp{python_version}-cp{python_version}-{arch}.whl"
+
+            # URL encode '+' in the version string
+            if '+' in version:
+                version, compute_platform = version.split('+')
+            else:
+                compute_platform = 'cpu'
+
+            wheel_url = f"https://download.pytorch.org/whl/{compute_platform}/{quote(wheel_name)}"
+
+            # Step 5: Check wheel existence (HEAD request)
+            response = requests.head(wheel_url, allow_redirects=True, timeout=10)
+            if response.status_code == 200:
+                self.size = int(response.headers.get("content-length", 0))
+                self.wheel_url = wheel_url
+                self.wheel = wheel_name
+                # print(f"Found PyTorch wheel: {wheel_name}, size: {self.size / (1024**2):.2f} MB")
+                return True
+            else:
+                ilog.error(f"Wheel not found: {wheel_url}, status: {response.status_code}")
+                return
+
+        except Exception as e:
+            ilog.error(f"Error resolving PyTorch wheel: {str(e)}")
+            return
+
+
+    def resolve_tensorrt_wheel(self) -> bool:
+        """Get TensorRT wheel URL from NVIDIA's index."""
+        python_exe = str(g_backend_dirs.python_exe)
+
+        # TensorRT is hosted on NVIDIA's PyPI index
+        nvidia_index = "https://pypi.nvidia.com"
+
+        # Set the extra_index_url if not already set
+        if not self.extra_index_url:
+            self.extra_index_url = nvidia_index
+
+        version_spec = f"=={self.version}" if self.version else ""
+
+        # Use pip download to get the URL
+        cmd = [
+            python_exe, "-m", "pip", "download",
+            "--no-deps",
+            "--no-cache-dir",
+            "--index-url", self.extra_index_url,
+            f"{self.name}{version_spec}",
+            "--progress-bar", "off",
+        ]
+
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                env=generate_backend_env(),
+            )
+
+            import re
+            url_pattern = re.compile(r'(https?://[^\s]+\.whl)')
+
+            for line in iter(proc.stdout.readline, ''):
+                line = line.strip()
+                print(line)  # Debug output
+
+                # Found URL - terminate immediately
+                if match := url_pattern.search(line):
+                    proc.terminate()
+                    self.url = match.group(1)
+                    self.wheel = unquote(self.url.split('/')[-1])
+
+                    # Parse version from wheel name
+                    parts = self.wheel.split('-')
+                    if len(parts) >= 2:
+                        self.version = parts[1]
+
+                    # Get size
+                    import requests
+                    try:
+                        resp = requests.head(self.url, timeout=10, allow_redirects=True)
+                        self.size = int(resp.headers.get('content-length', 0))
+                    except:
+                        self.size = 0
+
+                    ilog.info(f"Found {self.pretty_name}: {self.wheel}")
+                    ilog.info(f"URL: {self.url}")
+                    ilog.info(f"Size: {self.size / 1024**2:.1f} MB")
+                    return True
+
+                # Check for errors
+                if "No matching distribution found" in line:
+                    proc.terminate()
+                    self.supported = False
+                    ilog.warning(f"[W] {self.pretty_name} not supported on this platform")
+                    return False
+
+                if "could not find a version" in line.lower():
+                    proc.terminate()
+                    ilog.error(f"Version {self.version} not found for {self.name}")
+                    return False
+
+            proc.wait(timeout=30)
             return False
 
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            ilog.error(f"Timeout for {self.name}")
+            return False
         except Exception as e:
             ilog.error(f"Error: {e}")
             return False
+
+
+    def update_info(self):
+        if 'torch' in self.name:
+            self.resolve_torch_wheel()
+            self.get_wheel_size()
+
+        # elif 'tensorrt' in self.name:
+        #     # self.get_tensorrt_wheel_url()
+        #     return
+
+        else:
+            self.fetch_info_from_pypi()
+
 
     def _fast_pip_download(self) -> bool:
         """Quick pip download with early termination."""
@@ -191,12 +391,12 @@ class PyPackage:
             for line in iter(proc.stdout.readline, ''):
                 if match := url_pattern.search(line):
                     proc.terminate()
-                    self.url = match.group(1)
-                    self.wheel = unquote(self.url.split('/')[-1])
+                    self.wheel_url = match.group(1)
+                    self.wheel = unquote(self.wheel_url.split('/')[-1])
                     self.version = self.wheel.split('-')[1]
 
                     import requests
-                    resp = requests.head(self.url, timeout=10, allow_redirects=True)
+                    resp = requests.head(self.wheel_url, timeout=10, allow_redirects=True)
                     self.size = int(resp.headers.get('content-length', 0))
                     return True
 
@@ -211,186 +411,4 @@ class PyPackage:
 
         return False
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def get_wheel_url_fast(self) -> bool:
-        """Simplified version for pip 25.3."""
-        python_exe = str(g_backend_dirs.python_exe)
-
-        # # Check if installed
-        # if subprocess.run([python_exe, "-m", "pip", "show", self.name],
-        #                 capture_output=True).returncode == 0:
-        #     self.installed = True
-        #     ilog.info(f"{self.pretty_name} already installed")
-        #     return True
-
-        # Build command
-        index_url = ["--index-url", self.extra_index_url] if self.extra_index_url else []
-        version_spec = f"=={self.version}" if self.version else ""
-
-        cmd = [
-            python_exe, "-m", "pip", "install",
-            "--dry-run", "--ignore-installed", "--no-deps",
-            "--report", "-",
-            f"{self.name}{version_spec}",
-            *index_url,
-        ]
-
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True,
-                                timeout=30, check=True)
-            print(result)
-            report = json.loads(result.stdout)
-            pprint(report)
-
-            if report.get('install'):
-                pkg = report['install'][0]
-                self.url = pkg['download_info']['url']
-                self.wheel = unquote(self.url.split('/')[-1])
-                self.version = pkg['metadata']['version']
-
-                # Get size
-                import requests
-                resp = requests.head(self.url, timeout=10, allow_redirects=True)
-                self.size = int(resp.headers.get('content-length', 0))
-
-                ilog.info(f"Found {self.pretty_name}: {self.wheel}")
-                return True
-
-        except subprocess.CalledProcessError as e:
-            if "No matching distribution" in (e.stdout + e.stderr):
-                self.supported = False
-                ilog.warning(f"{self.pretty_name} not supported on this platform")
-        except Exception as e:
-            ilog.error(f"Error: {e}")
-
-        return False
-
-
-
-
-    # def update_wheel_url(self) -> bool:
-    #     python_exe = str(g_backend_dirs.python_exe)
-
-    #     timeout: float = 5
-    #     _retry: int = self.retry_count
-    #     if self.extra_index_url:
-    #         regex: re.Pattern = re.compile(
-    #             rf".*Downloading\s*(https:\/\/.*\/.*\.whl)"
-    #         )
-    #     else:
-    #         regex: re.Pattern = re.compile(
-    #             rf".*{self.name}.*(https:\/\/.*\/.*\.whl)\.metadata"
-    #         )
-
-    #     already_installed_regex = re.compile(
-    #         rf".*Requirement\s*already\s*satisfied:\s*{self.name}"
-    #     )
-    #     url: str = ""
-
-    #     start_time: float = time.time()
-    #     index_url: list[str] = (
-    #         ["--index-url", self.extra_index_url]
-    #         if self.extra_index_url
-    #         else []
-    #     )
-    #     version = f"=={self.version}" if self.version != '' else ''
-    #     pip_command: list[str] = [
-    #         python_exe,
-    #         "-m", "pip", "download",
-    #         # "--no-deps",
-    #         "--no-cache-dir",
-    #         f"{self.name}{version}",
-    #         *index_url,
-    #         "--progress-bar=off",
-    #         "-vvv"
-    #     ]
-    #     pip_command = list([x for x in pip_command if x != '' and x is not None])
-    #     # print(' '.join(pip_command))
-    #     while _retry > 0 and url == '' and not self.installed and self.supported:
-    #         sub_process = subprocess.Popen(
-    #             pip_command,
-    #             stdout=subprocess.PIPE,
-    #             stderr=subprocess.STDOUT
-    #         )
-
-    #         start_time = time.time()
-    #         while (
-    #             (time.time() - start_time) < timeout + (self.retry_count - _retry) * 5
-    #             and sub_process.poll() is None
-    #         ):
-    #             try:
-    #                 line = sub_process.stdout.readline().decode('utf-8').strip()
-    #             except:
-    #                 break
-    #             if self.name == 'torch':
-    #                 # and line.startswith("Obtaining dependency information"):
-    #                 print(lightcyan(line))
-
-    #             # if _retry < retry:
-    #             #     ilog.debug(line)
-
-    #             if (result := re.search(regex, line)):
-    #                 sub_process.terminate()
-    #                 url = result.group(1)
-    #                 break
-
-    #             if (result := re.search(already_installed_regex, line)):
-    #                 sub_process.terminate()
-    #                 self.installed = True
-    #                 break
-
-    #             if "No matching distribution found" in line:
-    #                 sub_process.terminate()
-    #                 self.supported = False
-    #                 ilog.warning(f"[W] {self.pretty_name} is not supported on this platform")
-    #                 break
-
-    #         if url == '' or self.installed:
-    #             if sub_process.poll() is None:
-    #                 sub_process.terminate()
-    #             while sub_process.poll() is None and (time.time() - start_time) > 2:
-    #                 time.sleep(0.5)
-
-    #             if not self.installed and self.supported:
-    #                 _retry -= 1
-    #                 timeout += (self.retry_count - _retry) * 5
-    #                 ilog.warning(f"retry: {_retry}, new timeout: timeout")
-
-    #     self.url = url
-    #     if self.url == '' and not self.installed and self.supported:
-    #         ilog.error(red(f"[E] Failed  to fetch url for {self.name}"))
-
-    #     elif self.installed:
-    #         ilog.info(f"{self.pretty_name} already installed")
-
-    #     elif self.url != '':
-    #         self.wheel = unquote(self.url.split('/')[-1])
-    #         self.version = unquote(self.wheel.split('-')[1])
-    #         response: requests.Response
-    #         try:
-    #             response = requests.get(self.url, stream=True)
-    #             response.raise_for_status()
-    #         except requests.exceptions.RequestException as e:
-    #             if str(e).startswith('404'):
-    #                 ilog.error(f"File {self.url} not found")
-    #             return False
-    #         self.size=int(response.headers.get('Content-length', 0))
-
-    #     return True
 
