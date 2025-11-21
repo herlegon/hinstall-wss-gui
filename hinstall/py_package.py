@@ -662,8 +662,10 @@ class PyPackage:
 
 
     def install(self, force: bool = False) -> bool:
-        if self.version == 'dev' and not self.installed:
-            self.installed = self._install_dev()
+        ilog.info(f"{self.name} installing {self.version}")
+        if self.version == 'dev':
+            if not self.installed:
+                self.installed = self._install_dev()
             return self.installed
 
         if self.uninstall_before:
@@ -698,12 +700,16 @@ class PyPackage:
                 last_line = line
             process.communicate(timeout=10)
 
-            if last_line and "Successfully installed" in last_line:
+            if (
+                "Successfully installed" in last_line
+                or "Requirement already satisfied"  in last_line
+            ):
                 ilog.info(f"{self.name} successfully installed")
                 return True
 
             else:
                 ilog.critical(f"{self.name} installation failed: {last_line}")
+                pprint(self)
                 return False
 
         except subprocess.CalledProcessError as e:

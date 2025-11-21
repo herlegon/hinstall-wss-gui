@@ -48,15 +48,14 @@ pypi = [
     # "wheel",
 
 # Upgradable
-    # "setuptools",
-    # "wheel",
-    # "psutil",
-    # "nvidia-ml-py",
+    "setuptools",
+    "wheel",
+    "psutil",
+    "nvidia-ml-py",
     "opencv-python",
-    # "numpy",
-    # "timm",
-    # "hytils",
-    # "hsys==dev",
+    "numpy",
+    "hytils==dev",
+    "hsys==dev",
 #     "backend",
 #     "pynnlib",
 
@@ -119,6 +118,9 @@ tensorrt-cu13-libs = "10.14.1.48.post1"
 # Microsoft DirectML
 [py_packages.delayed.directml]
 onnxruntime-directml = "1.23.0"
+
+[py_packages.delayed.timm]
+timm = ""
 
 
 

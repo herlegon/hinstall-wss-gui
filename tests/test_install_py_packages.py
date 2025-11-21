@@ -164,20 +164,20 @@ if __name__ == "__main__":
     print("Packages to install", lightcyan(", ".join((pkg.name for pkg in selected_pkgs))))
 
 
-    do_download = False
+    do_download = True
     for pkg in initial_pkgs:
         if pkg.size > 50000:
             pkg.do_cache = True
 
-        if do_download:
-            print(f"{lightcyan(pkg.name)} {'do cache' if pkg.do_cache else ''}")
+        if do_download and pkg.do_cache:
+            # print(f"{lightcyan(pkg.name)} {'do cache' if pkg.do_cache else ''}")
 
-            start_time = time.time()
-            downloaded = pkg.download_wheel(force=False, use_pip=True)
-            elapsed = time.time() - start_time
-            ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
+            # start_time = time.time()
+            # downloaded = pkg.download_wheel(force=False, use_pip=True)
+            # elapsed = time.time() - start_time
+            # ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
 
-            print(lightcyan("-" * 80))
+            # print(lightcyan("-" * 80))
             start_time = time.time()
             downloaded = pkg.download_wheel(force=False, use_pip=False)
             elapsed = time.time() - start_time
@@ -186,152 +186,8 @@ if __name__ == "__main__":
 
 
         # pprint(pkg)
-        pprint(pkg)
-        pkg.install(force=True)
+        # pprint(pkg)
+        pkg.install(force=False)
 
 
 
-
-
-    if False:
-
-
-        for pkg in py_packages.get_delayed():
-            pkg: PyPackage
-            pkg.do_cache = True
-
-            # if pkg.installed:
-            #     continue
-            # pprint(pkg)
-
-            pnv = (
-                "==".join((pkg.name, pkg.version))
-                if pkg.version
-                else pkg.name
-            )
-            # if pkg.name !=  "opencv-python":
-            # if pkg.name !=  "torch" and "cu" not in pkg.version:
-            #     continue
-
-            if pkg.name != "tensorrt":
-                continue
-
-            if pkg.do_cache and pkg.name != "tensorrt":
-                start_time = time.time()
-
-                if True:
-                    cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps {pnv}"
-                    if pkg.extra_index_url:
-                        cmd = f"{cmd} --extra-index-url={pkg.extra_index_url}"
-                    if pkg.index_url:
-                        cmd = f"{cmd} --index-url={pkg.index_url}"
-                    print(yellow(cmd))
-                    try:
-                        subprocess.run(cmd.split())
-                    except Exception as e:
-                        ilog.critical(f"failed to download wheel: {str(e)}")
-
-                elif False:
-                    print(red("download"))
-                    cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps {pnv}"
-                    # try:
-                    process = subprocess.Popen(
-                        cmd.split(),
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        bufsize=1
-                    )
-
-                    wheel = ""
-                    output_lines = []
-                    for line in process.stdout:
-                        line = line.rstrip()
-                        output_lines.append(line)
-
-                        # Parse download progress (e.g., "Downloading torch-2.0.0-cp311-cp311-linux_x86_64.whl (2.3GB)")
-                        if 'Downloading' in line:
-                            # Extract size info if present
-                            # Format: "Downloading package-1.0-py3-none-any.whl (1.2MB)"
-
-                            if match := re.search(r'([^\s]+\.whl)(?!\.metadata)', line):
-                                ilog.info(f"⬇️  {line}")
-                                wheel = match.group(1)
-                                break
-                        #     else:
-                        #         print(line)
-                        else:
-                            print(line)
-
-                    if not wheel:
-                        print(output_lines)
-
-                    filepath = g_backend_dirs.cache / wheel
-                    print(red(filepath))
-
-                    # Monitor file growth
-                    while process.poll() is None:
-                        if filepath.is_file():
-                            current_size = filepath.stat().st_size
-                            # Log progress based on file size
-                            ilog.info(f"Downloaded: {current_size / (1024**2):.1f} MB")
-                        time.sleep(0.2)
-
-
-
-                        # for line in process.stdout:
-                        #     line = line.rstrip()
-
-                        #     # Parse download progress (e.g., "Downloading torch-2.0.0-cp311-cp311-linux_x86_64.whl (2.3GB)")
-                        #     if 'Downloading' in line:
-                        #         # Extract size info if present
-                        #         # Format: "Downloading package-1.0-py3-none-any.whl (1.2MB)"
-                        #         match = re.search(r'([\d.]+\s*[KMGT]B)', line)
-                        #         if match:
-                        #             ilog.info(f"⬇️  {line}")
-                        #         else:
-                        #             ilog.info(f"⬇️  {line}")
-
-                        #     else:
-                        #         print(lightcyan(line))
-                        # process.wait()
-                        # if process.returncode != 0:
-                        #     ilog.error(f"Download failed with code {process.returncode}")
-
-                    # except Exception as e:
-                    #     ilog.critical(f"failed to download wheel: {str(e)}")
-
-                    print(red("END "))
-
-                else:
-                    # torch-2.9.1+cu130-cp312-cp312-win_amd64.whl
-                    #   24s
-
-                    # pkg.update_info()
-                    wheel_fp: Path = g_backend_dirs.cache / pkg.wheel
-                    if wheel_fp.is_file():
-                        print(lightgreen(f"Already downloaded {wheel_fp}"))
-                    else:
-                        print(red(f"error: wheel file {wheel_fp} shall exist before"))
-
-                    # pkg.download_wheel()
-
-                elapsed = time.time() - start_time
-                ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
-                # break
-
-            if pkg.name == "tensorrt":
-                pprint(pkg)
-                cmd = f"{python_exe} -m pip install --find-links {cache_dir} {pnv}"
-                backend_env = generate_backend_env()
-                try:
-                    subprocess.run(
-                        cmd.split(),
-                        env=backend_env,
-                    )
-                except Exception as e:
-                    ilog.critical(f"failed to install package {pkg.name}: {str(e)}")
-
-
-        # for pkg in initial_packages:
-        #     pkg.uninstall()
