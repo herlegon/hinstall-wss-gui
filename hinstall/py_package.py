@@ -10,7 +10,7 @@ from typing import Literal
 import requests
 import subprocess
 import sys
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 
 from .wheel_format import (
     filter_compatible_wheels, get_platform_tags, get_python_tags,
@@ -90,7 +90,7 @@ class PyPackage:
         import requests
         from html.parser import HTMLParser
 
-        index_url = f"{self.index_url}/{self.name}/"
+        index_url = f"{self.index_url}/{self.name.replace('_', '-')}/"
         # ilog.debug(f"index_url: {index_url}")
 
         # Fetch HTML index
@@ -176,9 +176,9 @@ class PyPackage:
             return False
 
         def _parse_version(v: str):
-            """Turn '1.2.10' into [1, 2, 10]."""
-            if '+' in v:
-                v = v.split('+')[0]
+            """Turn version strings into a list of integers."""
+            # Remove any non-numeric suffixes like .post1 or +rocm6.4
+            v = re.sub(r'(\.post\d+|[\+\-].*)', '', v)
             return [int(x) for x in v.split(".")]
 
         to_install = _parse_version(self.version)
@@ -192,6 +192,7 @@ class PyPackage:
         is_downgrading = current > to_install
         if is_downgrading:
             ilog.error(f"Downgrading is not permitted: {self.installed_version} -> {self.version}")
+
         return is_downgrading
 
 
@@ -233,7 +234,7 @@ class PyPackage:
             ilog.error(f"{self.name}: no version found in pypi releases")
             raise ValueError("version")
 
-        if sys.platform == 'win32':
+        if sys.platform == 'win32' and False:
             # Get platform-specific details
             platform_tag: str = get_platform_tags()
 
@@ -666,7 +667,7 @@ class PyPackage:
         return installed
 
 
-    def install(self, force: bool = False) -> bool:
+    def install(self, reinstall: bool = False, recover: bool = False) -> bool:
         ilog.info(f"{self.name} installing {self.version}")
         if self.version == 'dev':
             if not self.installed:
@@ -682,11 +683,14 @@ class PyPackage:
 
         python_exe = str(g_backend_dirs.python_exe)
         cmd = f"{python_exe} -m pip install --find-links {cache_dir} {pnv}"
+
         if self.extra_index_url:
             cmd = f"{cmd} --extra-index-url={self.extra_index_url}"
-
-        if force:
+        if reinstall:
             cmd = f"{cmd} --force-reinstall"
+        if recover:
+            cmd = f"{cmd} --force-reinstall --ignore-installed"
+
 
         ilog.debug(yellow(cmd))
 

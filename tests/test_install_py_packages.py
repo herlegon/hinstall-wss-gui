@@ -151,6 +151,7 @@ if __name__ == "__main__":
                 pkg: PyPackage
                 print(f"{lightcyan(pkg.name)}:\n    latest version: {pkg.latest_version}\n    selected: {pkg.version}")
                 print(f"    variant: {pkg.variant}")
+                print(f"    installed version: {pkg.installed_version}")
                 print(f"    wheel: {pkg.wheel}")
                 print(f"    wheel url: {pkg.wheel_url}")
                 print(f"    size: {pkg.size // 1024}kB")
@@ -205,40 +206,30 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    if not cuda:
-        ilog.info(f"CUDA")
-        for pkg in py_packages.get_by_execution_provider('cuda'):
-            pkg.skip = True
-            pkg.supported = False
 
-    if not tensorrt:
-        ilog.info(f"TensorRT")
-        for pkg in py_packages.get_by_execution_provider('cuda'):
-            pkg.skip = True
-            pkg.supported = False
+    for pkg in py_packages.get_by_execution_provider('cuda'):
+        pkg.skip = not cuda
+        pkg.supported = cuda
 
-    if not rocm:
-        ilog.info(f"Rocm")
-        for pkg in py_packages.get_by_execution_provider('rocm'):
-            pkg.skip = True
-            pkg.supported = False
+    for pkg in py_packages.get_by_execution_provider('rocm'):
+        pkg.skip = not rocm
+        pkg.supported = rocm
 
-    if not directml:
-        ilog.info(f"DirectML")
-        for pkg in py_packages.get_by_execution_provider('directml'):
-            pkg.skip = True
-            pkg.supported = False
+    for pkg in py_packages.get_by_execution_provider('directml'):
+        pkg.skip = not directml
+        pkg.supported = directml
 
     cpu_fallback = all([x is False for x in (cuda, tensorrt, rocm)])
     for pkg in py_packages.get_by_execution_provider('cpu'):
         pkg.skip = not cpu_fallback
         pkg.supported = cpu_fallback
 
+
     print("supported packages")
     supported_pkgs = py_packages.get_delayed(supported_only=True)
-    # for pkg in supported_pkgs:
-    #     print(lightcyan(pkg.pretty_name))
-    #     pprint(pkg)
+    for pkg in supported_pkgs:
+        print(lightcyan(pkg.pretty_name))
+        pprint(pkg)
 
     with ThreadPoolExecutor(max_workers=min(cpu_count, len(supported_pkgs))) as executor:
         executor.map(lambda pkg: pkg.update_info(), supported_pkgs)
@@ -272,5 +263,12 @@ if __name__ == "__main__":
     for pkg in supported_pkgs:
         if pkg.installed:
             continue
-        pkg.install(force=False)
+        pkg.install(reinstall=False)
+
+
+    py_packages.update_installed_versions()
+    for pkg in supported_pkgs:
+        if not pkg.installed:
+            ilog.critical(f"{pkg.name} not installed")
+            pkg.install(recover=True)
 

@@ -42,7 +42,7 @@ def main():
     req_packages = [
         "requests",
         "websockets",
-        # "setuptools",
+        "setuptools",
         # "wheel",
         ("hytils", 'local'),
     ]

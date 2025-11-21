@@ -85,26 +85,27 @@ onnxruntime = "1.23.2"
 
 # PyTorch
 [py_packages.delayed.torch.cuda]
-extra-index-url = "https://download.pytorch.org/whl/cu130"
+index-url = "https://download.pytorch.org/whl/cu130"
 torch = "2.9.1+cu130"
-torchvision = "0.24.0+cu130"
+torchvision = "0.24.1+cu130"
 
 [py_packages.delayed.torch.cpu]
-extra-index-url = "https://download.pytorch.org/whl/cpu"
+index-url = "https://download.pytorch.org/whl/cpu"
 torch = "2.9.1+cpu"
-torchvision = "0.24.0+cpu"
+torchvision = "0.24.1+cpu"
 
 [py_packages.delayed.torch.rocm]
-extra-index-url = "https://download.pytorch.org/whl/rocm6.4"
+index-url = "https://download.pytorch.org/whl/rocm6.4"
 torch = "2.9.1+rocm6.4"
-torchvision = "0.24.0+rocm6.4"
+torchvision = "0.24.1+rocm6.4"
 
 
 # Nvidia TensorRT
 [py_packages.delayed.tensorrt]
 index-url = "https://pypi.nvidia.com"
+tensorrt_cu13_libs = "10.14.1.48.post1"
 tensorrt = "10.14.1.48.post1"
-tensorrt-cu13-libs = "10.14.1.48.post1"
+do_cache = false
 
 # previous version
 # tensorrt-cu12 = "10.14.1.48.post1"
@@ -135,18 +136,19 @@ vspython = "VS python"
 avs = "AviSynth+ plugins"
 
 [py_packages.names]
-opencv-python = "OpenCV"
+directml = "Direct ML"
 numpy = "NumPy"
 nvidia-ml-py = "pyNVML"
-timm = "TIMM"
 onnx = "ONNX"
 onnxruntime = "ONNX Runtime"
+onnxruntime-directml = "ONNX Runtime (Direct ML)"
+opencv-python = "OpenCV"
+pillow = "Pillow"
 safetensors = "SafeTensors"
 tensorrt = "TensorRT"
-directml = "Direct ML"
+timm = "TIMM"
 torch = "PyTorch"
 torch-cuda = "PyTorch (CUDA)"
 torch-cpu = "PyTorch (CPU)"
 torch-rocm = "PyTorch (ROCm)"
 torchvision = "TorchVision"
-onnxruntime-directml = "ONNX Runtime (Direct ML)"
