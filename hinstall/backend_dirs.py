@@ -54,3 +54,18 @@ def get_backend_dirs(
     )
 g_backend_dirs: BackendDirectories = get_backend_dirs()
 
+
+
+def get_local_dev_dir() -> Path:
+    local_dev_dir: Path
+
+    if sys.platform == "win32":
+        local_dev_dir = Path("A:\\")
+
+    elif sys.platform == "linux":
+        local_dev_dir = Path.home() / "github"
+
+    elif sys.platform == "darwin":
+        local_dev_dir = Path.home() / company / "rehost"
+
+    return local_dev_dir

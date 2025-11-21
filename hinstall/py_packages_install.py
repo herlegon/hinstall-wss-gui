@@ -22,10 +22,16 @@ from .backend_dirs import g_backend_dirs
 
 g_backend_env = None
 
-def generate_backend_env(exclude: list[str] | None = None) -> dict | None:
+def generate_backend_env(
+    exclude: list[str] | None = None,
+    exclude_append: list[str] | None = None,
+) -> dict | None:
     global g_backend_env
     try:
-        backend_env = _generate_backend_env(exclude=exclude)
+        backend_env = _generate_backend_env(
+            exclude=exclude,
+            exclude_append=exclude_append
+        )
         if backend_env is None:
             ilog.critical("Backend env generation returned None (unexpected).")
             return None
@@ -40,21 +46,27 @@ def generate_backend_env(exclude: list[str] | None = None) -> dict | None:
 
 
 
-def _generate_backend_env(exclude: list[str] | None = None) -> dict:
+def _generate_backend_env(
+    exclude: list[str] | None = None,
+    exclude_append: list[str] | None = None,
+) -> dict:
     # Environnment
     # ilog.info(f"Local environment:")
     # ilog.info(get_python_env())
 
     if exclude is None:
-        forbidden_names: tuple[str] = (
+        forbidden_names: list[str] = [
             'python',
             'conda',
             'vapoursynth',
             'windowsapps',
             'miniconda',
-        )
+        ]
     else:
         forbidden_names = exclude
+
+    if exclude_append is not None:
+        forbidden_names.extend(exclude_append)
 
     python_dir: Path = g_backend_dirs.python_exe.parent
     if sys.platform == 'linux':
@@ -222,37 +234,6 @@ def get_pypackage_list(python_exe: Path | None = None) -> str:
         ilog.error(f"Unexpected error: {str(e)}")
 
     return result_str
-
-
-
-def get_pip_versions(python_exe: Path | None = None) -> dict[str, str]:
-    packages: dict[str, str] = {}
-
-    python_exe = str(g_backend_dirs.python_exe if python_exe is None else python_exe)
-    embedded_script = (Path(__file__).parent / "get_versions.py").resolve()
-    try:
-        result = subprocess.run(
-            [str(python_exe), str(embedded_script)],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        packages = json.loads(result.stdout)
-
-    except subprocess.CalledProcessError as e:
-        # Specific error if subprocess fails
-        ilog.error(f"Error occurred while updating pip: {str(e)}")
-
-    except Exception as e:
-        # Catch all other unexpected errors
-        ilog.error(f"Unexpected error: {str(e)}")
-
-    return packages
-
-
-
-
-
 
 
 

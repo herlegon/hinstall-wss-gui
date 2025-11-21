@@ -42,6 +42,7 @@ def main():
         "requests",
         "websockets",
         ("hytils", 'local'),
+        "setuptools",
     ]
 
     local_rehost_dir = (Path("/opt") / "herlegon" / "rehost").resolve()

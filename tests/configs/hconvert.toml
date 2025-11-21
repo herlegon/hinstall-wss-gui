@@ -44,17 +44,19 @@ pypi = [
 # In python package, because critical or small
     # "websockets",
     # "hytils",
+    # "setuptools",
+    # "wheel",
 
 # Upgradable
     # "setuptools",
     # "wheel",
-    "psutil",
-    "nvidia-ml-py",
+    # "psutil",
+    # "nvidia-ml-py",
     "opencv-python",
-    "numpy",
-    "timm",
-    "hytils",
-    "hsys",
+    # "numpy",
+    # "timm",
+    # "hytils",
+    # "hsys==dev",
 #     "backend",
 #     "pynnlib",
 
@@ -63,7 +65,7 @@ pypi = [
 
 # Second pass
 [py_packages.delayed]
-do_cache = true
+do_cache = false
 
 [py_packages.delayed.torch]
 uninstall_before = true

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 import platform
 from pprint import pprint
 import re
@@ -15,9 +16,11 @@ from .wheel_format import (
 from hytils import lightcyan, lightgreen, red, yellow
 
 from .logger import ilog
-from .backend_dirs import g_backend_dirs
-from .py_packages_install import generate_backend_env
-
+from .backend_dirs import g_backend_dirs, get_local_dev_dir
+from .py_packages_install import (
+    generate_backend_env,
+    g_backend_env,
+)
 
 
 @dataclass
@@ -67,7 +70,12 @@ class PyPackage:
         self._installed_version = version
         # Do not allow downgrading.
         # if really needed, reinstall a new python package.
-        if self.is_downgrading():
+        local_versions = ('dev', 'local')
+        if (
+            self.version in local_versions
+            or self._installed_version in local_versions
+            or self.is_downgrading()
+        ):
             self.version = self._installed_version
             self.installed = True
 
@@ -190,11 +198,13 @@ class PyPackage:
     def fetch_info_from_pypi(self) -> bool:
         try:
             url = f"https://pypi.org/pypi/{self.name}/json"
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=5)
             if response.status_code != 200:
-                raise ValueError("package")
+                ilog.error(f"package: status code: {response.status_code}")
+                raise ValueError(f"package")
 
         except Exception as e:
+            ilog.error(f"Exception: {str(e)}")
             raise ValueError("package")
 
         data = response.json()
@@ -207,15 +217,14 @@ class PyPackage:
         # Update wheel
         version = self.version if self.version else self.latest_version
         if not version:
-            ilog.warning(f"no version")
-            print(red(f"{self.name}: no version found"))
+            ilog.error(f"{self.name}: no version found")
             return False
 
         if 'torch' in self.name or 'tensorrt' in self.name:
             return True
 
         if version and version not in data['releases'].keys():
-            print(red(f"{self.name}: no version found"))
+            ilog.error(f"{self.name}: no version found in pypi releases")
             raise ValueError("version")
 
         if sys.platform == 'win32':
@@ -304,7 +313,7 @@ class PyPackage:
                 ilog.debug(f"python_tags: {get_python_tags()}")
                 ilog.debug(f"platform_tags: {get_platform_tags()}")
                 for f in data['releases'][version]:
-                    print(f['filename'])
+                    ilog.debug(f"    {f['filename']}")
                 ilog.error(f"{self.name} failed filtering files")
                 raise ValueError("wheel")
 
@@ -321,7 +330,7 @@ class PyPackage:
 
     def get_wheel_size(self) -> int:
         if not self.wheel_url:
-            return
+            return 0
 
         self.size = 0
         try:
@@ -392,7 +401,6 @@ class PyPackage:
                 self.size = int(response.headers.get("content-length", 0))
                 self.wheel_url = wheel_url
                 self.wheel = self.wheel
-                print(f"Found PyTorch wheel: {self.wheel}, size: {self.size / (1024**2):.2f} MB")
                 return True
             else:
                 ilog.error(f"Wheel not found: {wheel_url}, status: {response.status_code}")
@@ -403,13 +411,16 @@ class PyPackage:
             return
 
 
-
     def update_info(self):
         if 'torch' in self.name:
             self.resolve_torch_wheel()
 
         elif 'tensorrt' in self.name:
             self.resolve_tensorrt_wheel()
+            return
+
+        elif self.version == 'dev':
+            ilog.info(f"{self.name} use local repo used for dev")
             return
 
         else:
@@ -433,54 +444,54 @@ class PyPackage:
                 return
 
 
-    def _fast_pip_download(self) -> bool:
-        """Quick pip download with early termination."""
+    def _download_wheel_with_pip(self, force: bool = False) -> bool:
+        ilog.info(f"{self.name} use pip to download wheel")
         python_exe = str(g_backend_dirs.python_exe)
-        index_url = ["--index-url", self.extra_index_url] if self.extra_index_url else []
-        version_spec = f"=={self.version}" if self.version else ""
+        cache_dir: Path = g_backend_dirs.cache
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        wheel_fp: Path = cache_dir / self.wheel
 
-        cmd = [
-            python_exe, "-m", "pip", "download",
-            "--no-deps", "--no-cache-dir",
-            f"{self.name}{version_spec}",
-            *index_url,
-            "--progress-bar", "off",
-        ]
+        pnv = "==".join((self.name, self.version)) if self.version else self.name
 
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        cmd = f"{python_exe} -m pip download -d {str(cache_dir)} --no-deps {pnv}"
+        if self.extra_index_url:
+            cmd = f"{cmd} --extra-index-url={self.extra_index_url}"
+        if self.index_url:
+            cmd = f"{cmd} --index-url={self.index_url}"
 
-        import re
-        url_pattern = re.compile(r'(https?://[^\s]+\.whl)')
+        if force:
+            wheel_fp.unlink(missing_ok=True)
+            cmd = f"{cmd} --no-cache-dir"
 
+        ilog.debug(yellow(cmd))
+
+        env = generate_backend_env(exclude_append=['proxy',])
         try:
-            for line in iter(proc.stdout.readline, ''):
-                if match := url_pattern.search(line):
-                    proc.terminate()
-                    self.wheel_url = match.group(1)
-                    self.wheel = unquote(self.wheel_url.split('/')[-1])
-                    self.version = self.wheel.split('-')[1]
+            result = subprocess.run(
+                cmd.split(),
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            # Check if 'Successfully installed' is in the output
+            if "Successfully downloaded" in result.stdout.splitlines()[-1]:
+                ilog.info(f"{self.name} successfully downloaded")
+                return True
 
-                    import requests
-                    resp = requests.head(self.wheel_url, timeout=10, allow_redirects=True)
-                    self.size = int(resp.headers.get('content-length', 0))
-                    return True
+            else:
+                ilog.critical(f"{self.name} download failed: {result.stdout}")
+                return False
 
-                if "No matching distribution" in line:
-                    proc.terminate()
-                    self.supported = False
-                    return False
+        except subprocess.CalledProcessError as e:
+            ilog.critical(f"{self.name} failed to downloaded package {e.stderr}")
+            return False
 
-            proc.wait(timeout=15)
-        except:
-            proc.kill()
+        except Exception as e:
+            ilog.critical(f"{self.name} download encountered an error: {str(e)}")
+            return False
 
         return False
-
-
-
-
-
-
 
 
     @staticmethod
@@ -496,34 +507,21 @@ class PyPackage:
             return f"{hours:.1f}h"
 
 
-    def download_wheel(self, timeout: int = 300) -> bool:
-        """Download wheel with percentage progress
-
-        Args:
-            url: Direct URL to wheel file
-            cache_dir: Directory to save wheel
-            self.wheel: Filename for the wheel
-            timeout: Request timeout in seconds
-
-        Returns:
-            True if successful, False otherwise
-        """
-        g_backend_dirs.cache.mkdir(parents=True, exist_ok=True)
-        wheel_fp = g_backend_dirs.cache / self.wheel
-
-        pprint(self)
-        print(red(wheel_fp))
-
-        if not self.wheel_url:
-            ilog.error(f"cannot download with request, TODO use pip as a fallback")
+    def _download_wheel_with_requests(
+        self,
+        force: bool = False,
+        stall_timeout: float = 30,
+    ) -> bool:
+        ilog.info(f"{self.name} use requests to download wheel")
+        cache_dir: Path = g_backend_dirs.cache
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        wheel_fp: Path = cache_dir / self.wheel
 
         try:
-            ilog.info(f"Get wheel info...")
-
             response = requests.get(
                 self.wheel_url,
                 stream=True,
-                timeout=timeout,
+                timeout=10,
                 allow_redirects=True
             )
             response.raise_for_status()
@@ -533,8 +531,13 @@ class PyPackage:
             if total_size == 0:
                 ilog.warning(f"Unknown file size for {self.wheel}")
 
-            if wheel_fp.is_file() and wheel_fp.stat().st_size == total_size:
-                ilog.info(f"{self.wheel} File was already downloaded")
+            if (
+                not force
+                and wheel_fp.is_file()
+                and wheel_fp.stat().st_size == total_size
+            ):
+                ilog.info(f"{self.name} File was already downloaded")
+                self.downloaded = True
                 return True
 
             ilog.info(f"Downloading {self.wheel}...")
@@ -547,10 +550,11 @@ class PyPackage:
                     if chunk:
                         f.write(chunk)
                         downloaded += len(chunk)
+                        last_data_time = time.time()
 
                         # Log progress every 0.5 seconds to avoid spam
                         current_time = time.time()
-                        if current_time - last_log_time >= 0.5 and total_size > 0:
+                        if current_time - last_log_time >= 1 and total_size > 0:
                             percentage = (downloaded / total_size) * 100
                             size_mb = downloaded / (1024**2)
                             total_mb = total_size / (1024**2)
@@ -573,6 +577,13 @@ class PyPackage:
                             )
                             last_log_time = current_time
 
+                else:
+                    # Empty chunk - check for stall
+                    if time.time() - last_data_time > stall_timeout:
+                        raise requests.exceptions.Timeout(
+                            f"Download stalled: no data received for {stall_timeout}s"
+                        )
+
             elapsed = time.time() - start_time
             speed_mbps = (downloaded / (1024**2)) / elapsed if elapsed > 0 else 0
             ilog.info(f"✓ Downloaded {self.wheel} ({downloaded / (1024**2):.1f} MB in {self.format_time(elapsed)} at {speed_mbps:.1f} MB/s)")
@@ -591,11 +602,67 @@ class PyPackage:
             return False
 
 
+    def download_wheel(
+        self,
+        force: bool = False,
+        stall_timeout: float = 30,
+        use_pip: bool = False,
+    ) -> bool:
+        if not self.do_cache:
+            return True
+
+        if self.version in ('dev', 'local'):
+            return True
+
+        g_backend_dirs.cache.mkdir(parents=True, exist_ok=True)
+        wheel_fp = g_backend_dirs.cache / self.wheel
+        ilog.info(f"{self.name} download to {wheel_fp}")
+
+        if not self.wheel_url or use_pip:
+            return self._download_wheel_with_pip(force=force)
+
+        return self._download_wheel_with_requests(
+            force=force, stall_timeout=stall_timeout
+        )
 
 
-    # Usage example:
-    # success = download_wheel(
-    #     url="https://download.pytorch.org/whl/cu121/torch-2.0.0+cu121-cp311-cp311-linux_x86_64.whl",
-    #     cache_dir="./cache",
-    #     self.wheel="torch-2.0.0+cu121-cp311-cp311-linux_x86_64.whl"
-    # )
+    def _install_dev(self) -> bool:
+        installed: bool = False
+
+        dev_dir = get_local_dev_dir() / self.name
+        ilog.info(f"{self.name} install for dev: {str(dev_dir)}")
+        if dev_dir.is_dir():
+            cmd = f"{str(g_backend_dirs.python_exe)} -m pip install -e {str(dev_dir)}"
+            env = generate_backend_env(exclude_append=['proxy',])
+            try:
+                result = subprocess.run(
+                    cmd.split(),
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                # Check if 'Successfully installed' is in the output
+                if "Successfully installed" in result.stdout.splitlines()[:-1]:
+                    ilog.info(f"{self.name} successfully installed for dev.")
+                    installed = True
+                else:
+                    ilog.critical(f"{self.name} installation failed: {result.stdout}")
+            except subprocess.CalledProcessError as e:
+                ilog.critical(f"{self.name} failed to install package for dev: {e.stderr}")
+            except Exception as e:
+                ilog.critical(f"{self.name} installation encountered an error: {str(e)}")
+
+        else:
+            ilog.critical(f"{self.name} not a valid dir: {str(dev_dir)}")
+            installed = True
+
+        return installed
+
+
+    def install(self) -> bool:
+        if self.version == 'dev' and not self.installed:
+            self.installed = self._install_dev()
+
+
+        return self.installed

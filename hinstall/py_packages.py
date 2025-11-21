@@ -1,7 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
+from importlib.metadata import Distribution, distributions
 import json
 import multiprocessing
 from pathlib import Path
+from pprint import pprint
 import re
 import subprocess
 import sys
@@ -172,35 +174,53 @@ class PyPackages(list):
         self.update_installed_versions()
 
 
+    @staticmethod
+    def get_pkg_info(d: Distribution):
+        try:
+            if direct_url := d.read_text('direct_url.json'):
+                info: dict[str, str] = json.loads(direct_url)
+                if info.get('dir_info', {}).get('editable'):
+                    return {"version": d.version, "location": info.get('url', '').replace('file://', '')}
+        except (FileNotFoundError, TypeError):
+            pass
+        return {"version": d.version}
+
 
     def update_installed_versions(self) -> None:
         packages_versions: dict[str, str] = {}
 
         python_exe = str(g_backend_dirs.python_exe)
-        embedded_script = (Path(__file__).parent / "get_versions.py").resolve()
-        try:
-            result = subprocess.run(
-                [str(python_exe), str(embedded_script)],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            packages_versions = json.loads(result.stdout)
+        if sys.executable != python_exe:
+            embedded_script = (Path(__file__).parent / "get_versions.py").resolve()
+            try:
+                result = subprocess.run(
+                    [str(python_exe), str(embedded_script)],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                packages_versions = json.loads(result.stdout)
 
-        except subprocess.CalledProcessError as e:
-            # Specific error if subprocess fails
-            ilog.error(f"Error occurred while updating pip: {str(e)}")
+            except subprocess.CalledProcessError as e:
+                # Specific error if subprocess fails
+                ilog.error(f"Error occurred while updating pip: {str(e)}")
 
-        except Exception as e:
-            # Catch all other unexpected errors
-            ilog.error(f"Unexpected error: {str(e)}")
+            except Exception as e:
+                # Catch all other unexpected errors
+                ilog.error(f"Unexpected error: {str(e)}")
+
+        else:
+            # Doesn't work if this function is not executed in standalone env
+            packages_versions = {d.name: self.get_pkg_info(d) for d in distributions()}
 
         if packages_versions:
             for pkg in self:
                 pkg: PyPackage
-                pkg.installed_version = (
-                    packages_versions.get(pkg.name, pkg.installed_version)
-                )
+                version = packages_versions.get(pkg.name, pkg.installed_version)
+                if isinstance(version, dict):
+                    version = 'dev'
+                if version:
+                    pkg.installed_version = version
                 pkg.installed = True if pkg.installed_version else False
 
 
