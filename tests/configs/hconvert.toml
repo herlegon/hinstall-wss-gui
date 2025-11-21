@@ -44,17 +44,17 @@ pypi = [
 # In python package, because critical or small
     # "websockets",
     # "hytils",
-    # "setuptools",
-    # "wheel",
 
 # Upgradable
-    "hytils",
+    # "setuptools",
+    # "wheel",
     "psutil",
     "nvidia-ml-py",
-    "hsys",
     "opencv-python",
     "numpy",
     "timm",
+    "hytils",
+    "hsys",
 #     "backend",
 #     "pynnlib",
 
@@ -72,32 +72,30 @@ uninstall_before = true
 # Safetensors
 [py_packages.delayed.safetensors]
 safetensors = "0.7.0"
-skip = true
+
 
 # Onnx
 [py_packages.delayed.onnx]
 onnx = "1.19.1"
 onnxruntime = "1.23.2"
-skip = true
+
 
 # PyTorch
 [py_packages.delayed.torch.cuda]
 extra-index-url = "https://download.pytorch.org/whl/cu130"
 torch = "2.9.1+cu130"
 torchvision = "0.24.0+cu130"
-skip = true
 
 [py_packages.delayed.torch.cpu]
 extra-index-url = "https://download.pytorch.org/whl/cpu"
 torch = "2.9.1+cpu"
 torchvision = "0.24.0+cpu"
-skip = true
 
 [py_packages.delayed.torch.rocm]
 extra-index-url = "https://download.pytorch.org/whl/rocm6.4"
 torch = "2.9.1+rocm6.4"
 torchvision = "0.24.0+rocm6.4"
-skip = true
+
 
 # Nvidia TensorRT
 [py_packages.delayed.tensorrt]
@@ -115,7 +113,8 @@ tensorrt-cu13-libs = "10.14.1.48.post1"
 #   tensorrt-cu13
 #   nvidia-cuda-runtime
 
-# DirectML
+
+# Microsoft DirectML
 [py_packages.delayed.directml]
 onnxruntime-directml = "1.23.0"
 

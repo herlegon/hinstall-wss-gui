@@ -133,9 +133,9 @@ class PyPackage:
         self.wheel = best["filename"]
         self.wheel_url = best["url"]
         self.supported = True
+        self.size = self.get_wheel_size()
 
         return True
-
 
 
     def uninstall(self) -> bool:
@@ -319,26 +319,29 @@ class PyPackage:
         return True
 
 
-
-    def get_wheel_size(self) -> None:
+    def get_wheel_size(self) -> int:
         if not self.wheel_url:
             return
+
         self.size = 0
         try:
             # HEAD request avoids downloading the file
             response = requests.head(
                 self.wheel_url,
+                stream=True,
                 allow_redirects=True,
                 timeout=5
             )
             if response.status_code == 200:
-                self.size = int(response.headers.get("content-length", 0))
+                size = int(response.headers.get("content-length", 0))
 
             else:
                 ilog.error(f"Failed to get wheel size, status code: {response.status_code}")
 
         except Exception as e:
             ilog.error(f"exception while getting size: {str(e)}")
+
+        return size
 
 
     def resolve_torch_wheel(self):
@@ -389,7 +392,7 @@ class PyPackage:
                 self.size = int(response.headers.get("content-length", 0))
                 self.wheel_url = wheel_url
                 self.wheel = self.wheel
-                # print(f"Found PyTorch wheel: {self.wheel}, size: {self.size / (1024**2):.2f} MB")
+                print(f"Found PyTorch wheel: {self.wheel}, size: {self.size / (1024**2):.2f} MB")
                 return True
             else:
                 ilog.error(f"Wheel not found: {wheel_url}, status: {response.status_code}")
@@ -404,7 +407,6 @@ class PyPackage:
     def update_info(self):
         if 'torch' in self.name:
             self.resolve_torch_wheel()
-            self.get_wheel_size()
 
         elif 'tensorrt' in self.name:
             self.resolve_tensorrt_wheel()

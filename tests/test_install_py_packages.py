@@ -149,7 +149,7 @@ if __name__ == "__main__":
         elapsed = time.time() - start_time
         for pkg in selected_pkgs:
             pkg: PyPackage
-            print(f"{pkg.name}:\n    latest version: {pkg.latest_version}\n    selected: {pkg.version}")
+            print(f"{lightcyan(pkg.name)}:\n    latest version: {pkg.latest_version}\n    selected: {pkg.version}")
             print(f"    variant: {pkg.variant}")
             print(f"    wheel: {pkg.wheel}")
             print(f"    wheel url: {pkg.wheel_url}")
