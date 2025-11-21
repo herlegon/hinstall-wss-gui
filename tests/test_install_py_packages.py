@@ -86,9 +86,9 @@ if __name__ == "__main__":
 
     # List uninstalled python packages
     if False:
-        uninstalled_packages = py_packages.get_not_installed()
+        uninstalled_pkgs = py_packages.get_not_installed()
         print("uninstalled")
-        pprint(uninstalled_packages)
+        pprint(uninstalled_pkgs)
 
     # get_pypackage_list()
     # update_package_info(py_packages[0])
@@ -100,17 +100,17 @@ if __name__ == "__main__":
 
     # Update wheels
     if False:
-        uninstalled_packages = py_packages.get_delayed().get_not_installed()
+        uninstalled_pkgs = py_packages.get_delayed().get_not_installed()
         pprint(f"get wheel url")
-        for pkg in uninstalled_packages:
+        for pkg in uninstalled_pkgs:
             pkg: PyPackage
             pkg.update_wheel_url()
-        pprint(uninstalled_packages)
+        pprint(uninstalled_pkgs)
 
     if False:
         # uninstalled_packages = py_packages.get_initial().get_not_installed()
-        uninstalled_packages = py_packages.get_not_installed()
-        for pkg in uninstalled_packages:
+        uninstalled_pkgs = py_packages.get_not_installed()
+        for pkg in uninstalled_pkgs:
             pkg: PyPackage
             if (
                 pkg.variant in 'cuda'
@@ -126,15 +126,17 @@ if __name__ == "__main__":
                 print(f"    size: {pkg.size}")
 
 
-    initial_packages = py_packages.get_initial()
-    uninstalled_packages = initial_packages.get_not_installed()
+    initial_pkgs = py_packages.get_initial()
+    uninstalled_pkgs = initial_pkgs.get_not_installed()
+    delayed_pkgs = py_packages.get_delayed()
 
     if True:
         cpu_count = multiprocessing.cpu_count()
         cpu_count = max(cpu_count - 1, int(cpu_count * 4 / 5))
 
 
-        selected_pkgs = initial_packages
+        selected_pkgs = py_packages
+
         start_time = time.time()
         if False:
             for pkg in selected_pkgs:
@@ -156,6 +158,7 @@ if __name__ == "__main__":
 
         # sys.exit()
 
+    sys.exit()
 
     python_exe = str(g_backend_dirs.python_exe)
     cache_dir = str(g_backend_dirs.cache)
@@ -189,7 +192,9 @@ if __name__ == "__main__":
             if True:
                 cmd = f"{python_exe} -m pip download -d {cache_dir} --no-deps {pnv}"
                 if pkg.extra_index_url:
-                    cmd = f"{cmd} --index-url={pkg.extra_index_url}"
+                    cmd = f"{cmd} --extra-index-url={pkg.extra_index_url}"
+                if pkg.index_url:
+                    cmd = f"{cmd} --index-url={pkg.index_url}"
                 print(yellow(cmd))
                 try:
                     subprocess.run(cmd.split())
@@ -286,10 +291,8 @@ if __name__ == "__main__":
             # break
 
         if pkg.name == "tensorrt":
+            pprint(pkg)
             cmd = f"{python_exe} -m pip install --find-links {cache_dir} {pnv}"
-            pprint(os.environ)
-            print(yellow(cmd))
-            pprint(backend_env)
             backend_env = generate_backend_env()
             try:
                 subprocess.run(

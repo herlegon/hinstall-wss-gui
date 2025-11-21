@@ -9,60 +9,14 @@ import subprocess
 import sys
 from urllib.parse import quote, unquote
 
-from hytils import lightgreen, red, yellow
+from .wheel_format import (
+    filter_compatible_wheels, get_platform_tags, get_python_tags,
+)
+from hytils import lightcyan, lightgreen, red, yellow
 
 from .logger import ilog
 from .backend_dirs import g_backend_dirs
 from .py_packages_install import generate_backend_env
-
-
-def get_platform_tag():
-    """Generate platform tag using only stdlib."""
-    system = platform.system().lower()
-    machine = platform.machine().lower()
-
-    if system == "windows":
-        if machine in ("amd64", "x86_64"):
-            plat = "win_amd64"
-        elif machine in ("x86", "i386", "i686"):
-            plat = "win32"
-        elif machine == "arm64":
-            plat = "win_arm64"
-        else:
-            plat = f"win_{machine}"
-
-    elif system == "darwin":
-        # macOS version
-        mac_ver = platform.mac_ver()[0]
-        if mac_ver:
-            parts = mac_ver.split('.')
-            mac_ver_str = f"{parts[0]}_{parts[1] if len(parts) > 1 else '0'}"
-        else:
-            mac_ver_str = "10_9"  # fallback
-
-        if machine == "arm64":
-            plat = f"macosx_{mac_ver_str}_arm64"
-        elif machine in ("x86_64", "amd64"):
-            plat = f"macosx_{mac_ver_str}_x86_64"
-        else:
-            plat = f"macosx_{mac_ver_str}_{machine}"
-
-    elif system == "linux":
-        if machine in ("x86_64", "amd64"):
-            arch = "x86_64"
-        elif machine in ("aarch64", "arm64"):
-            arch = "aarch64"
-        elif machine in ("i386", "i686"):
-            arch = "i686"
-        else:
-            arch = machine
-
-        plat = f"manylinux2014_{arch}"
-
-    else:
-        plat = sysconfig.get_platform().replace('-', '_').replace('.', '_')
-
-    return plat
 
 
 
@@ -71,6 +25,7 @@ class PyPackage:
     pretty_name: str
     name: str
     variant: str = ""
+    skip: bool = False
 
     # version to install, installed and latest from pypi
     version: str = ""
@@ -78,6 +33,8 @@ class PyPackage:
     latest_version: str = ""
 
     extra_index_url: str = ""
+    index_url: str = ""
+
     wheel: str = ""
     wheel_url: str = ""
     size: int = 0
@@ -113,6 +70,72 @@ class PyPackage:
         if self.is_downgrading():
             self.version = self._installed_version
             self.installed = True
+
+
+    def resolve_tensorrt_wheel(self) -> bool:
+        """Resolve the best TensorRT wheel from NVIDIA's simple index."""
+
+        import requests
+        from html.parser import HTMLParser
+
+        index_url = f"{self.index_url}/{self.name}/"
+        # ilog.debug(f"index_url: {index_url}")
+
+        # Fetch HTML index
+        try:
+            response = requests.get(index_url, timeout=10)
+            response.raise_for_status()
+        except Exception as e:
+            ilog.error(f"[TensorRT] Failed to fetch index: {e}")
+            return False
+
+        # --- Parse links from simple HTML page ---
+        class LinkParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.links = []
+
+            def handle_starttag(self, tag, attrs):
+                if tag != "a":
+                    return
+                for k, v in attrs:
+                    if k == "href":
+                        clean_href = v.split("#")[0]
+                        fname = clean_href.split("/")[-1]
+                        self.links.append(fname)
+
+        parser = LinkParser()
+        parser.feed(response.text)
+
+        # Collect all wheels for this version
+        wheels = []
+        target_version = self.version
+
+        # ilog.debug(f"\n  ".join(parser.links))
+        for href in parser.links:
+            fname = href.split("/")[-1]
+            if fname.endswith(".whl") and target_version in fname:
+                wheels.append({
+                    "filename": fname,
+                    "url": href if href.startswith("http") else index_url + href,
+                })
+
+        if not wheels:
+            # ilog.error(f"{self.name} No wheels found for version {self.version}")
+            return False
+
+        matches = filter_compatible_wheels(wheels)
+        if not matches:
+            ilog.error(f"{self.name} No compatible wheel found for your platform.")
+            return False
+
+        best = matches[0]
+        self.wheel = best["filename"]
+        self.wheel_url = best["url"]
+        self.supported = True
+
+        return True
+
 
 
     def uninstall(self) -> bool:
@@ -164,11 +187,10 @@ class PyPackage:
         self.size = wheel_file['size']
 
 
-
     def fetch_info_from_pypi(self) -> bool:
         try:
             url = f"https://pypi.org/pypi/{self.name}/json"
-            response = requests.get(url, timeout=5)
+            response = requests.get(url, timeout=10)
             if response.status_code != 200:
                 raise ValueError("package")
 
@@ -186,90 +208,113 @@ class PyPackage:
         version = self.version if self.version else self.latest_version
         if not version:
             ilog.warning(f"no version")
-            raise
+            print(red(f"{self.name}: no version found"))
             return False
 
-        if 'torch' in self.name:
-            raise
+        if 'torch' in self.name or 'tensorrt' in self.name:
             return True
 
         if version and version not in data['releases'].keys():
+            print(red(f"{self.name}: no version found"))
             raise ValueError("version")
 
-        # Get platform-specific details
-        platform_tag: str = get_platform_tag()
+        if sys.platform == 'win32':
+            # Get platform-specific details
+            platform_tag: str = get_platform_tags()
 
-        # Look for a wheel file that matches the platform, Python version, and architecture
-        files = []
-        for f in data['releases'][version]:
-            filename: str = f['filename']
-            if (
-                filename.endswith('.whl')
-                and (
-                    platform_tag in filename or "-any" in filename
+
+            # Look for a wheel file that matches the platform, Python version, and architecture
+            files = []
+            for f in data['releases'][version]:
+                filename: str = f['filename']
+                if (
+                    filename.endswith('.whl')
+                    and (
+                        platform_tag in filename or "-any" in filename
+                    )
+                ):
+                    files.append(f)
+
+
+            if not files:
+                # pprint(data['releases'][version])
+                print(red(f"{self.name}: no files"))
+                print(platform_tag)
+                for f in data['releases'][version]:
+                    print(f['filename'])
+                raise ValueError("wheel")
+
+            if len(files) == 1:
+                self._update_wheel_info(files[0])
+                return True
+
+            # Find the minimum python version
+            py_prefix = list(set([f['python_version'][:2] for f in files]))
+
+            if "cp" in py_prefix:
+                py_versions = sorted(
+                    list(set([
+                        int(f['python_version'][2:])
+                        for f in files
+                        if f['python_version'][:2] == 'cp'
+                    ]))
                 )
-            ):
-                files.append(f)
+            elif "py" in py_prefix:
+                py_versions = set()
+                version_pattern = r'cp(\d{3})'
+                for f in files:
+                    versions = re.findall(version_pattern, f['filename'])
+                    py_versions.update(versions)
+                py_versions = sorted(list(map(int, py_versions)))
 
-        if not files:
-            pprint(data['releases'][version])
-            raise ValueError("wheel")
+            else:
+                ilog.error(f"py_prefix not supported")
+                raise ValueError("wheel")
 
-        if len(files) == 1:
-            self._update_wheel_info(files[0])
-            return True
+            current_version = sys.version_info.major * 100 + sys.version_info.minor
+            if current_version in py_versions:
+                highest_supported_version = current_version
 
-        # Find the minimum python version
-        py_prefix = list(set([f['python_version'][:2] for f in files]))
+            elif len(py_versions) == 1:
+                if current_version != py_versions[0]:
+                    ilog.error(f"{self.name} only a single version found")
 
-        if "cp" in py_prefix:
-            py_versions = sorted(
-                list(set([
-                    int(f['python_version'][2:])
-                    for f in files
-                    if f['python_version'][:2] == 'cp'
-                ]))
-            )
-        elif "py" in py_prefix:
-            py_versions = set()
-            version_pattern = r'cp(\d{3})'
-            for f in files:
-                versions = re.findall(version_pattern, f['filename'])
-                py_versions.update(versions)
-            py_versions = sorted(list(map(int, py_versions)))
+                    print(red(f"{self.name}: one remaining but incompatible"))
+                    raise ValueError("wheel")
+            else:
+                highest_supported_version = None
+                for v in py_versions:
+                    if v <= current_version:
+                        highest_supported_version = v
+                if not highest_supported_version:
+                    print(red(f"{self.name}: one remaining but incompatible"))
+                    raise ValueError("wheel")
+            version_filter = f"cp{highest_supported_version}"
+            files = [f for f in files if version_filter in f['filename']]
+
+
+            if len(files) == 1:
+                self._update_wheel_info(files[0])
+                return True
+
 
         else:
-            ilog.error(f"py_prefix not supported")
-            raise ValueError("wheel")
-
-        current_version = sys.version_info.major * 100 + sys.version_info.minor
-        if current_version in py_versions:
-            highest_supported_version = current_version
-
-        elif len(py_versions) == 1:
-            if current_version != py_versions[0]:
-                ilog.error(f"{self.name} only a single version found")
+            files = filter_compatible_wheels(data['releases'][version])
+            if files is None or not files:
+                ilog.debug(f"python_tags: {get_python_tags()}")
+                ilog.debug(f"platform_tags: {get_platform_tags()}")
+                for f in data['releases'][version]:
+                    print(f['filename'])
+                ilog.error(f"{self.name} failed filtering files")
                 raise ValueError("wheel")
-        else:
-            highest_supported_version = None
-            for v in py_versions:
-                if v <= current_version:
-                    highest_supported_version = v
-            if not highest_supported_version:
-                raise ValueError("wheel")
-        version_filter = f"cp{highest_supported_version}"
-        files = [f for f in files if version_filter in f['filename']]
 
-
-        if len(files) == 1:
             self._update_wheel_info(files[0])
             return True
-
 
         print(red(f"{self.name} No compatible wheel file found"))
-        pprint(self)
-        pprint(files)
-        pprint(data['releases'][version])
+        # pprint(self)
+        # pprint(files)
+        # pprint(data['releases'][version])
         raise ValueError(f"{self.name} No compatible wheel file found")
         return True
 
@@ -355,102 +400,15 @@ class PyPackage:
             return
 
 
-    def resolve_tensorrt_wheel(self) -> bool:
-        """Get TensorRT wheel URL from NVIDIA's index."""
-        python_exe = str(g_backend_dirs.python_exe)
-
-        # TensorRT is hosted on NVIDIA's PyPI index
-        nvidia_index = "https://pypi.nvidia.com"
-
-        # Set the extra_index_url if not already set
-        if not self.extra_index_url:
-            self.extra_index_url = nvidia_index
-
-        version_spec = f"=={self.version}" if self.version else ""
-
-        # Use pip download to get the URL
-        cmd = [
-            python_exe, "-m", "pip", "download",
-            "--no-deps",
-            "--no-cache-dir",
-            "--index-url", self.extra_index_url,
-            f"{self.name}{version_spec}",
-            "--progress-bar", "off",
-        ]
-
-        try:
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                env=generate_backend_env(),
-            )
-
-            import re
-            url_pattern = re.compile(r'(https?://[^\s]+\.whl)')
-
-            for line in iter(proc.stdout.readline, ''):
-                line = line.strip()
-                print(line)  # Debug output
-
-                # Found URL - terminate immediately
-                if match := url_pattern.search(line):
-                    proc.terminate()
-                    self.url = match.group(1)
-                    self.wheel = unquote(self.url.split('/')[-1])
-
-                    # Parse version from wheel name
-                    parts = self.wheel.split('-')
-                    if len(parts) >= 2:
-                        self.version = parts[1]
-
-                    # Get size
-                    import requests
-                    try:
-                        resp = requests.head(self.url, timeout=10, allow_redirects=True)
-                        self.size = int(resp.headers.get('content-length', 0))
-                    except:
-                        self.size = 0
-
-                    ilog.info(f"Found {self.pretty_name}: {self.wheel}")
-                    ilog.info(f"URL: {self.url}")
-                    ilog.info(f"Size: {self.size / 1024**2:.1f} MB")
-                    return True
-
-                # Check for errors
-                if "No matching distribution found" in line:
-                    proc.terminate()
-                    self.supported = False
-                    ilog.warning(f"[W] {self.pretty_name} not supported on this platform")
-                    return False
-
-                if "could not find a version" in line.lower():
-                    proc.terminate()
-                    ilog.error(f"Version {self.version} not found for {self.name}")
-                    return False
-
-            proc.wait(timeout=30)
-            return False
-
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            ilog.error(f"Timeout for {self.name}")
-            return False
-        except Exception as e:
-            ilog.error(f"Error: {e}")
-            return False
-
 
     def update_info(self):
         if 'torch' in self.name:
             self.resolve_torch_wheel()
             self.get_wheel_size()
 
-        # elif 'tensorrt' in self.name:
-        #     # self.get_tensorrt_wheel_url()
-        #     return
+        elif 'tensorrt' in self.name:
+            self.resolve_tensorrt_wheel()
+            return
 
         else:
             try:

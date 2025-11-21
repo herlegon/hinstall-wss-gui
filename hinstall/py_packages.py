@@ -79,22 +79,28 @@ class PyPackages(list):
         delayed: dict[str, Any] = platform_data.get('delayed', {})
         property_keys: tuple[str] = (
             'extra-index-url',
+            'index-url',
             'do_cache',
             'uninstall_before',
             'names',
+            'skip',
         )
 
         for category, category_data in delayed.items():
             if not isinstance(category_data, dict):
                 continue
 
+            skip = category_data.get('skip', delayed.get('skip', False))
             extra_index_url = category_data.get('extra-index-url', delayed.get('extra-index-url', ''))
+            index_url = category_data.get('index-url', delayed.get('index-url', ''))
             do_cache = category_data.get('do_cache', delayed.get('do_cache', False))
             uninstall_before = category_data.get('uninstall_before', delayed.get('uninstall_before', False))
 
             for key, value in category_data.items():
                 key: str
                 if key in property_keys:
+                    continue
+                if skip:
                     continue
 
                 # Handle nested structures (like torch with cpu/cuda/rocm variants)
@@ -103,7 +109,9 @@ class PyPackages(list):
 
                         if variant in property_keys:
                             continue
+                        skip = value.get('skip', skip)
                         variant_extra_index = value.get('extra-index-url', extra_index_url)
+                        variant_index_url = value.get('index-url', index_url)
                         do_cache = value.get('do_cache', do_cache)
                         uninstall_before = (
                             value.get(
@@ -111,6 +119,8 @@ class PyPackages(list):
                                 value.get('uninstall_before', uninstall_before)
                             )
                         )
+                        if skip:
+                            continue
 
                         variant: str
                         if not isinstance(variant_data, dict):
@@ -130,10 +140,12 @@ class PyPackages(list):
                                         name=pkg_name,
                                         version=pkg_version,
                                         extra_index_url=variant_extra_index,
+                                        index_url=index_url,
                                         delayed_install=True,
                                         do_cache=do_cache,
                                         uninstall_before=uninstall_before,
                                         supported=False,
+                                        skip=skip,
                                     )
                                 )
 
@@ -147,9 +159,11 @@ class PyPackages(list):
                             name=key,
                             version=value,
                             extra_index_url=extra_index_url,
+                            index_url=index_url,
                             delayed_install=True,
                             do_cache=do_cache,
                             supported=False,
+                            skip=skip,
                         )
                     )
 
