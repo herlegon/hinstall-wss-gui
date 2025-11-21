@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import io
 from pathlib import Path
 import platform
 from pprint import pprint
@@ -147,7 +148,7 @@ class PyPackage:
 
 
     def uninstall(self) -> bool:
-        ilog.debug(f"uninstall {self.name}")
+        ilog.debug(f"{self.name} uninstall")
         python_exe = str(g_backend_dirs.python_exe)
 
         pip_command: str = f"{python_exe} -m pip uninstall -y {self.name}"
@@ -660,9 +661,56 @@ class PyPackage:
         return installed
 
 
-    def install(self) -> bool:
+    def install(self, force: bool = False) -> bool:
         if self.version == 'dev' and not self.installed:
             self.installed = self._install_dev()
+            return self.installed
 
+        if self.uninstall_before:
+            self.uninstall()
 
-        return self.installed
+        cache_dir: Path = g_backend_dirs.cache
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        pnv = "==".join((self.name, self.version)) if self.version else self.name
+
+        python_exe = str(g_backend_dirs.python_exe)
+        cmd = f"{python_exe} -m pip install --find-links {cache_dir} {pnv}"
+        if self.extra_index_url:
+            cmd = f"{cmd} --extra-index-url={self.extra_index_url}"
+
+        if force:
+            cmd = f"{cmd} --force-reinstall"
+
+        env = generate_backend_env(exclude_append=['proxy',])
+        try:
+            process: subprocess.Popen = subprocess.Popen(
+                cmd.split(),
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+
+            stdout: io.TextIOWrapper = process.stdout
+            last_line: str = ""
+            for line in stdout:
+                ilog.debug(line.rstrip())
+                last_line = line
+            process.communicate(timeout=10)
+
+            if last_line and "Successfully installed" in last_line:
+                ilog.info(f"{self.name} successfully installed")
+                return True
+
+            else:
+                ilog.critical(f"{self.name} installation failed: {last_line}")
+                return False
+
+        except subprocess.CalledProcessError as e:
+            ilog.critical(f"{self.name} failed to install package {e.stderr}")
+            return False
+
+        except Exception as e:
+            ilog.critical(f"{self.name} installation encountered an error: {str(e)}")
+            return False
+

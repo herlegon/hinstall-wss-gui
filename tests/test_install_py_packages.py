@@ -164,26 +164,30 @@ if __name__ == "__main__":
     print("Packages to install", lightcyan(", ".join((pkg.name for pkg in selected_pkgs))))
 
 
-
+    do_download = False
     for pkg in initial_pkgs:
         if pkg.size > 50000:
             pkg.do_cache = True
 
-        print(f"{lightcyan(pkg.name)} {'do cache' if pkg.do_cache else ''}")
+        if do_download:
+            print(f"{lightcyan(pkg.name)} {'do cache' if pkg.do_cache else ''}")
 
-        start_time = time.time()
-        downloaded = pkg.download_wheel(force=True, use_pip=True)
-        elapsed = time.time() - start_time
-        ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
+            start_time = time.time()
+            downloaded = pkg.download_wheel(force=False, use_pip=True)
+            elapsed = time.time() - start_time
+            ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
 
-        print(lightcyan("-" * 80))
-        start_time = time.time()
-        downloaded = pkg.download_wheel(force=True, use_pip=False)
-        elapsed = time.time() - start_time
-        ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
+            print(lightcyan("-" * 80))
+            start_time = time.time()
+            downloaded = pkg.download_wheel(force=False, use_pip=False)
+            elapsed = time.time() - start_time
+            ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
+            print(lightcyan("-" * 80))
+
 
         # pprint(pkg)
-        # pkg.install()
+        pprint(pkg)
+        pkg.install(force=True)
 
 
 

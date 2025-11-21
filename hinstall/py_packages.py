@@ -9,6 +9,8 @@ import subprocess
 import sys
 from typing import Any, Literal
 
+from hytils import red
+
 from .backend_dirs import g_backend_dirs
 from .logger import ilog
 from .py_package import PyPackage
@@ -218,7 +220,10 @@ class PyPackages(list):
                 pkg: PyPackage
                 version = packages_versions.get(pkg.name, pkg.installed_version)
                 if isinstance(version, dict):
-                    version = 'dev'
+                    if 'location' in version:
+                        version = 'dev'
+                    else:
+                        version = version.get('version', pkg.installed_version)
                 if version:
                     pkg.installed_version = version
                 pkg.installed = True if pkg.installed_version else False
