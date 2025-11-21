@@ -54,6 +54,7 @@ pypi = [
     "nvidia-ml-py",
     "opencv-python",
     "numpy",
+    "pillow",
     "hytils==dev",
     "hsys==dev",
 #     "backend",
@@ -64,15 +65,16 @@ pypi = [
 
 # Second pass
 [py_packages.delayed]
-do_cache = false
+do_cache = true
 
-[py_packages.delayed.torch]
-uninstall_before = true
+# [py_packages.delayed.torch]
+# uninstall_before = true
 
 
 # Safetensors
 [py_packages.delayed.safetensors]
 safetensors = "0.7.0"
+do_cache = false
 
 
 # Onnx
@@ -121,6 +123,7 @@ onnxruntime-directml = "1.23.0"
 
 [py_packages.delayed.timm]
 timm = ""
+do_cache = false
 
 
 

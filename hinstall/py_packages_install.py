@@ -1,7 +1,12 @@
 import os
 from pathlib import Path
+from pprint import pprint
+import re
+import shutil
 import subprocess
 import sys
+
+from hytils import yellow
 from .logger import ilog
 from .backend_dirs import g_backend_dirs
 
@@ -214,3 +219,52 @@ def get_pypackage_list(python_exe: Path | None = None) -> str:
     return result_str
 
 
+
+def clean_invalid_distributions():
+    try:
+        result = subprocess.run(
+            [str(g_backend_dirs.python_exe), '-m', 'pip', 'list'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+    except Exception as e:
+        ilog.warning()
+        return
+
+    installed_packages = result.stdout
+
+    # Look for invalid distribution warnings and stop once the actual list starts
+    for line in installed_packages.split('\n'):
+        # Stop once we hit the "Package" line (start of actual package list)
+        if "Package" in line:
+            break
+        if "Ignoring invalid distribution ~" in line:
+            print(f"found: {line}")
+            # Extract the name of the invalid distribution and its path from the warning
+            match = re.search(r'Ignoring invalid distribution ~\S+ \((/[\S]+)\)', line)
+            if match:
+                package_path = match.group(1)
+                print(f"Found invalid distribution at: {package_path}")
+                # Clean up the invalid package directory
+                remove_invalid_package_files(Path(package_path))
+
+
+
+def remove_invalid_package_files(invalid_package_dir: Path):
+    # Check if the path exists
+    if not invalid_package_dir.exists():
+        print(f"Path {invalid_package_dir} does not exist.")
+        return
+
+    try:
+        # Iterate over all directories in the invalid_package_dir that start with '~'
+        for dir_path in invalid_package_dir.iterdir():
+            if dir_path.is_dir() and dir_path.name.startswith("~"):
+                ilog.debug(f"remove invalid directory: {dir_path}")
+
+                # Remove the directory and all its contents
+                shutil.rmtree(dir_path)
+                print(f"Removed directory: {dir_path}")
+    except OSError as e:
+        print(f"Error removing directories in {invalid_package_dir}: {e}")

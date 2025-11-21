@@ -9,7 +9,7 @@ import subprocess
 import sys
 from typing import Any, Literal
 
-from hytils import red
+from hytils import red, yellow
 
 from .backend_dirs import g_backend_dirs
 from .logger import ilog
@@ -31,6 +31,17 @@ HERLEGON_PACKAGES: tuple[str] = (
     'pynnlib',
 )
 
+EXECUTION_PROVIDERS = ('cuda', 'rocm', 'directml', 'cpu')
+
+def get_execution_provider(key: str) -> str:
+    for ep in EXECUTION_PROVIDERS:
+        if ep in key:
+            return ep
+        elif 'tensorrt' in key:
+                return 'cuda'
+        elif 'ncnn' in key:
+                return 'cpu'
+    return 'cpu'
 
 
 class PyPackages(list):
@@ -107,15 +118,17 @@ class PyPackages(list):
                 if skip:
                     continue
 
+                ep: str = get_execution_provider(key)
+
                 # Handle nested structures (like torch with cpu/cuda/rocm variants)
                 if isinstance(value, dict):
                     for variant, variant_data in value.items():
-
                         if variant in property_keys:
                             continue
+
                         skip = value.get('skip', skip)
                         variant_extra_index = value.get('extra-index-url', extra_index_url)
-                        variant_index_url = value.get('index-url', index_url)
+                        index_url = value.get('index-url', index_url)
                         do_cache = value.get('do_cache', do_cache)
                         uninstall_before = (
                             value.get(
@@ -129,6 +142,7 @@ class PyPackages(list):
                         variant: str
                         if not isinstance(variant_data, dict):
                             pkg_name, pkg_version = variant, variant_data
+
                             if pkg_name not in property_keys:
                                 pretty_name = (
                                     pretty_names.get(
@@ -150,6 +164,7 @@ class PyPackages(list):
                                         uninstall_before=uninstall_before,
                                         supported=False,
                                         skip=skip,
+                                        ep=ep,
                                     )
                                 )
 
@@ -168,9 +183,10 @@ class PyPackages(list):
                             do_cache=do_cache,
                             supported=False,
                             skip=skip,
+                            ep=ep,
                         )
                     )
-
+        # raise
         if keep_up_to_date:
             self.update_latest_versions()
         self.update_installed_versions()
@@ -242,10 +258,14 @@ class PyPackages(list):
         return result
 
 
-    def get_delayed(self) -> 'PyPackages':
+    def get_delayed(self, supported_only: bool = False) -> 'PyPackages':
         """Get all packages marked for delayed installation."""
         result = PyPackages()
-        result.extend([pkg for pkg in self if pkg.delayed_install])
+        if supported_only:
+            result.extend([pkg for pkg in self if pkg.delayed_install and pkg.supported])
+        else:
+            result.extend([pkg for pkg in self if pkg.delayed_install])
+
         return result
 
 
@@ -260,7 +280,17 @@ class PyPackages(list):
         return names
 
 
-    def get_by_variant(self, variant: Literal['cpu', 'cuda', 'rocm']) -> list[PyPackage]:
+    def get_by_execution_provider(
+        self,
+        execution_provider: Literal['cpu', 'cuda', 'rocm', 'directml']
+    ) -> list[PyPackage]:
+        return [pkg for pkg in self if pkg.ep == execution_provider]
+
+
+    def get_by_variant(
+        self,
+        variant: Literal['cpu', 'cuda', 'rocm', 'directml']
+    ) -> list[PyPackage]:
         return [pkg for pkg in self if pkg.variant == variant]
 
 

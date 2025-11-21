@@ -25,6 +25,7 @@ from hinstall import (
     generate_backend_env,
     get_python_version,
     ilog,
+    clean_invalid_distributions,
 )
 
 
@@ -63,6 +64,8 @@ if __name__ == "__main__":
         ilog.info(f"{python_package.name} is installed.")
 
     backend_env = generate_backend_env()
+
+    clean_invalid_distributions()
 
 
     # Python packages
@@ -134,7 +137,7 @@ if __name__ == "__main__":
         if selected_pkgs:
 
             start_time = time.time()
-            if True:
+            if False:
                 for pkg in selected_pkgs:
                     pkg: PyPackage
                     pprint(pkg)
@@ -161,11 +164,10 @@ if __name__ == "__main__":
     cache_dir = str(g_backend_dirs.cache)
     # Cache only the big packages
     print(f"Cache: {cache_dir}")
-    print("Packages to install", lightcyan(", ".join((pkg.name for pkg in selected_pkgs))))
-
+    print("Packages to install: ", lightcyan(", ".join((pkg.name for pkg in uninstalled_pkgs))))
 
     do_download = True
-    for pkg in initial_pkgs:
+    for pkg in uninstalled_pkgs:
         if pkg.size > 50000:
             pkg.do_cache = True
 
@@ -184,10 +186,91 @@ if __name__ == "__main__":
             ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
             print(lightcyan("-" * 80))
 
-
-        # pprint(pkg)
         # pprint(pkg)
         pkg.install(force=False)
 
 
+
+    from hsys import is_feature_supported
+
+    cuda = is_feature_supported('cuda')
+    tensorrt = is_feature_supported('tensorrt')
+    directml = is_feature_supported('directml')
+    rocm = is_feature_supported('rocm')
+
+    print(f"CUDA: {'✅' if cuda else '❌'}")
+    print(f"TensorRT: {'✅' if tensorrt else '❌'}")
+    print(f"direct ML: {'✅' if directml else '❌'}")
+    print(f"RocM: {'✅' if rocm else '❌'}")
+
+    start_time = time.time()
+
+    if not cuda:
+        ilog.info(f"CUDA")
+        for pkg in py_packages.get_by_execution_provider('cuda'):
+            pkg.skip = True
+            pkg.supported = False
+
+    if not tensorrt:
+        ilog.info(f"TensorRT")
+        for pkg in py_packages.get_by_execution_provider('cuda'):
+            pkg.skip = True
+            pkg.supported = False
+
+    if not rocm:
+        ilog.info(f"Rocm")
+        for pkg in py_packages.get_by_execution_provider('rocm'):
+            pkg.skip = True
+            pkg.supported = False
+
+    if not directml:
+        ilog.info(f"DirectML")
+        for pkg in py_packages.get_by_execution_provider('directml'):
+            pkg.skip = True
+            pkg.supported = False
+
+    cpu_fallback = all([x is False for x in (cuda, tensorrt, rocm)])
+    for pkg in py_packages.get_by_execution_provider('cpu'):
+        pkg.skip = not cpu_fallback
+        pkg.supported = cpu_fallback
+
+    print("supported packages")
+    supported_pkgs = py_packages.get_delayed(supported_only=True)
+    # for pkg in supported_pkgs:
+    #     print(lightcyan(pkg.pretty_name))
+    #     pprint(pkg)
+
+    with ThreadPoolExecutor(max_workers=min(cpu_count, len(supported_pkgs))) as executor:
+        executor.map(lambda pkg: pkg.update_info(), supported_pkgs)
+    elapsed = time.time() - start_time
+
+    for pkg in supported_pkgs:
+        pkg: PyPackage
+        print(f"{lightcyan(pkg.name)}:\n    latest version: {pkg.latest_version}\n    selected: {pkg.version}")
+        print(f"    installed: {pkg.installed}")
+        print(f"    variant: {pkg.variant}")
+        print(f"    wheel: {pkg.wheel}")
+        print(f"    wheel url: {pkg.wheel_url}")
+        print(f"    size: {pkg.size // 1024}kB")
+        print(f"    do cache: {pkg.do_cache}")
+    ilog.info(f"updated in {elapsed:.02f}s")
+
+
+    print("Packages to install: ", lightcyan(", ".join((pkg.name for pkg in uninstalled_pkgs))))
+
+
+    for pkg in supported_pkgs:
+        if pkg.installed or not pkg.do_cache:
+            continue
+
+        start_time = time.time()
+        downloaded = pkg.download_wheel(force=False, use_pip=False)
+        elapsed = time.time() - start_time
+        ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
+        print(lightcyan("-" * 80))
+
+    for pkg in supported_pkgs:
+        if pkg.installed:
+            continue
+        pkg.install(force=False)
 

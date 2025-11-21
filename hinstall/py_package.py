@@ -6,6 +6,7 @@ from pprint import pprint
 import re
 import sysconfig
 import time
+from typing import Literal
 import requests
 import subprocess
 import sys
@@ -20,7 +21,6 @@ from .logger import ilog
 from .backend_dirs import g_backend_dirs, get_local_dev_dir
 from .py_packages_install import (
     generate_backend_env,
-    g_backend_env,
 )
 
 
@@ -49,6 +49,9 @@ class PyPackage:
     do_cache: bool = False
 
     _retry_count: int = 3
+
+    # Execution provider
+    ep: Literal['cuda', 'rocm', 'directml', 'cpu'] = ''
 
 
     @property
@@ -174,6 +177,8 @@ class PyPackage:
 
         def _parse_version(v: str):
             """Turn '1.2.10' into [1, 2, 10]."""
+            if '+' in v:
+                v = v.split('+')[0]
             return [int(x) for x in v.split(".")]
 
         to_install = _parse_version(self.version)
@@ -644,7 +649,7 @@ class PyPackage:
                     check=True,
                 )
                 # Check if 'Successfully installed' is in the output
-                if "Successfully installed" in result.stdout.splitlines()[:-1]:
+                if "Successfully installed" in result.stdout.splitlines()[-1]:
                     ilog.info(f"{self.name} successfully installed for dev.")
                     installed = True
                 else:
@@ -682,6 +687,8 @@ class PyPackage:
 
         if force:
             cmd = f"{cmd} --force-reinstall"
+
+        ilog.debug(yellow(cmd))
 
         env = generate_backend_env(exclude_append=['proxy',])
         try:

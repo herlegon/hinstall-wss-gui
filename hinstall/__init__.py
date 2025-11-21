@@ -25,6 +25,7 @@ from .py_packages_install import (
     get_python_version,
     generate_backend_env,
     g_backend_env,
+    clean_invalid_distributions,
 )
 
 __all__ = [
@@ -46,5 +47,7 @@ __all__ = [
 
     "get_domain_from_url",
     "check_site_reachable",
+
+    "clean_invalid_distributions"
 
 ]
