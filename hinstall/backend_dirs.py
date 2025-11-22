@@ -47,8 +47,8 @@ def get_backend_dirs(
 
     return BackendDirectories(
         app=base / company / app_name,
-        python_exe=base / company / app_name / "python" / python_exe,
-        external=base / company / app_name,
+        python_exe=base / company / "python" / python_exe,
+        external=base / company,
         cache=cache_dir,
         models=base / company / "models",
     )
