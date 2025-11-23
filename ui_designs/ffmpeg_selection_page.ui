@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>FFmpegSelectionPage</class>
+ <widget class="QWidget" name="FFmpegSelectionPage">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>551</width>
+    <height>457</height>
+   </rect>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QFrame" name="optionsFrame">
+     <property name="styleSheet">
+      <string notr="true">QFrame { background-color: #16213e; border-radius: 12px; }</string>
+     </property>
+     <layout class="QVBoxLayout" name="optionsLayout">
+      <property name="spacing">
+       <number>8</number>
+      </property>
+      <property name="leftMargin">
+       <number>20</number>
+      </property>
+      <property name="topMargin">
+       <number>20</number>
+      </property>
+      <property name="rightMargin">
+       <number>20</number>
+      </property>
+      <property name="bottomMargin">
+       <number>20</number>
+      </property>
+      <item>
+       <widget class="QRadioButton" name="fallbackRb">
+        <property name="text">
+         <string>Fallback FFmpeg (Recommended)</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="desc1">
+        <property name="styleSheet">
+         <string notr="true">color: #999; font-size: 12px; margin-left: 32px; margin-bottom: 10px;</string>
+        </property>
+        <property name="text">
+         <string>Free codecs included: AV1, VP8, VP9, DNxHD, Vorbis, Opus, FLAC, PCM.
+H.264/H.265 decoding included for playback support.
+Hardware-accelerated H.264/H.265 encoders (requires an NVIDIA GPU).
+Does NOT include software H.264/H.265, AAC, or MP3 encoders.
+Safe for personal or commercial use without additional licenses.</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="systemRb">
+        <property name="text">
+         <string>Use an existing FFmpeg on your system</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="desc2">
+        <property name="styleSheet">
+         <string notr="true">color: #888; font-size: 12px; margin-left: 32px; margin-bottom: 5px;</string>
+        </property>
+        <property name="text">
+         <string>Select a pre-installed FFmpeg binary. Your software will call it externally.
+You are responsible for license and patent compliance, including commercial use.</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="downloadRb">
+        <property name="text">
+         <string>Download FFmpeg from a third-party</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="desc3">
+        <property name="styleSheet">
+         <string notr="true">color: #888; font-size: 12px; margin-left: 32px;</string>
+        </property>
+        <property name="text">
+         <string>Includes full software H.264/H.265/AAC/MP3 encoders (GPL and patent-encumbered).
+Provided by a third party (e.g., BtbN). You are responsible for any licenses or patents.
+Commercial use may require separate patent licenses.</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="pathLayout">
+        <property name="leftMargin">
+         <number>30</number>
+        </property>
+        <property name="topMargin">
+         <number>5</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="pathLabel">
+          <property name="styleSheet">
+           <string notr="true">color: #666; font-size: 12px;</string>
+          </property>
+          <property name="text">
+           <string>No file selected</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="browseBtn">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="text">
+           <string>Browse</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="disclaimerLabel">
+     <property name="styleSheet">
+      <string notr="true">color: #888; font-size: 11px; font-style: italic; margin-top: 20px;</string>
+     </property>
+     <property name="text">
+      <string>**Disclaimer:**
+Neither Herlogon nor their developers is not responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

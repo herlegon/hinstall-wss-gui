@@ -14,11 +14,12 @@ from .base_page import BasePage
 
 
 
-class PythonInstallPage(BasePage):
+class BackendInstallPage(BasePage):
     install_complete = Signal()
 
-    def __init__(self):
+    def __init__(self, parent=None):
         super().__init__(
+            parent,
             "Python Environment",
             "Setting up the Python runtime environment. This won't take long."
         )

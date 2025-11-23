@@ -19,25 +19,44 @@ from .base_page import BasePage
 class SettingsPage(BasePage):
     install_complete = Signal()
 
-    def __init__(self):
+    def __init__(self, parent=None):
         super().__init__(
-            "Settings & Packages",
-            "Configure installation preferences and install required packages."
+            parent,
+            "", # No title in header, handled by content
+            ""
         )
 
-        # Settings
+        # Main layout
+        self.layout.setContentsMargins(40, 40, 40, 40)
+        self.layout.setSpacing(20)
+
+        # Welcome Text
+        welcome_label = QLabel("Welcome")
+        welcome_label.setStyleSheet("color: #fff; font-size: 24px; font-weight: bold;")
+        self.layout.addWidget(welcome_label)
+
+        description_label = QLabel(
+            "This will install third parties sofwtare and a computational resources based on your system."
+        )
+        description_label.setWordWrap(True)
+        description_label.setStyleSheet("color: #ccc; font-size: 14px; margin-bottom: 20px;")
+        self.layout.addWidget(description_label)
+
+        # Settings Container
         settings_frame = QFrame()
         settings_frame.setStyleSheet("""
             QFrame { background-color: #16213e; border-radius: 12px; }
         """)
         settings_layout = QVBoxLayout(settings_frame)
         settings_layout.setContentsMargins(20, 20, 20, 20)
-        settings_layout.setSpacing(12)
+        settings_layout.setSpacing(20)
 
+        # Checkbox Style
         cb_style = """
             QCheckBox {
-                color: #ccc;
+                color: #fff;
                 font-size: 14px;
+                font-weight: bold;
                 spacing: 10px;
             }
             QCheckBox::indicator {
@@ -55,69 +74,45 @@ class SettingsPage(BasePage):
                 border-color: #667eea;
             }
         """
+        desc_style = "color: #888; font-size: 12px; margin-left: 32px;"
 
-        self.auto_update_cb = QCheckBox("  Always keep application up to date")
-        self.auto_update_cb.setChecked(True)
-        self.auto_update_cb.setStyleSheet(cb_style)
-        settings_layout.addWidget(self.auto_update_cb)
+        # Checkbox 1: Cache (Moved to right side as per request)
+        # To put it on the right, we can use a QHBoxLayout with a stretch on the left.
+        
+        cb1_container = QWidget()
+        cb1_layout = QHBoxLayout(cb1_container)
+        cb1_layout.setContentsMargins(0, 0, 0, 0)
+        cb1_layout.addStretch() # Push to right
 
-        self.cache_cb = QCheckBox("  Cache large packages locally")
+        # Inner layout for checkbox + description to keep them together
+        right_aligned_layout = QVBoxLayout()
+        right_aligned_layout.setSpacing(4)
+        right_aligned_layout.setAlignment(Qt.AlignRight)
+
+        self.cache_cb = QCheckBox("Cache download packages")
         self.cache_cb.setChecked(True)
         self.cache_cb.setStyleSheet(cb_style)
-        settings_layout.addWidget(self.cache_cb)
+        self.cache_cb.setLayoutDirection(Qt.RightToLeft) # Text on left, box on right? Or just aligned right?
+        # "put the checkboxes below: one to cache... as a simple title and description" -> "on the first page put the checkboxes on the right"
+        # Usually means alignment. Let's align the whole block to the right.
+        
+        right_aligned_layout.addWidget(self.cache_cb)
+        
+        cb1_desc = QLabel("Used when reinstalling or updating the software to save bandwidth.")
+        cb1_desc.setStyleSheet(desc_style)
+        cb1_desc.setWordWrap(True)
+        cb1_desc.setAlignment(Qt.AlignRight) # Align text to right too
+        right_aligned_layout.addWidget(cb1_desc)
+        
+        cb1_layout.addLayout(right_aligned_layout)
+        settings_layout.addWidget(cb1_container)
+
+        # Removed Auto Update Checkbox from here (moved to last page)
 
         self.layout.addWidget(settings_frame)
-
-        # Package installation
-        pkg_label = QLabel("External Packages")
-        pkg_label.setStyleSheet("color: #fff; font-size: 16px; font-weight: bold; margin-top: 10px;")
-        self.layout.addWidget(pkg_label)
-
-        self.package_list = QTextEdit()
-        self.package_list.setReadOnly(True)
-        self.package_list.setMaximumHeight(80)
-        self.package_list.setStyleSheet("""
-            QTextEdit {
-                background-color: #0f0f1a;
-                color: #888;
-                border: 1px solid #2d2d44;
-                border-radius: 8px;
-                padding: 10px;
-                font-family: 'Consolas', monospace;
-                font-size: 12px;
-            }
-        """)
-        self.layout.addWidget(self.package_list)
-
-        self.progress_bar = StyledProgressBar("#a55eea")
-        self.layout.addWidget(self.progress_bar)
-
-        self.status_label = QLabel("Waiting...")
-        self.status_label.setStyleSheet("color: #666; font-size: 12px;")
-        self.layout.addWidget(self.status_label)
-
         self.layout.addStretch()
-        self.worker = None
-        self._complete = False
 
     def start_installation(self):
-        packages = ["numpy", "pandas", "opencv-python", "pillow", "requests"]
-        self.package_list.setText("  •  ".join(packages))
-
-        steps = [f"Installing {p}..." for p in packages]
-        self.worker = InstallWorker(steps)
-        self.worker.progress.connect(self.progress_bar.setValue)
-        self.worker.status.connect(self.status_label.setText)
-        self.worker.finished_signal.connect(self._on_finished)
-        self.worker.start()
-
-    def _on_finished(self, success):
-        if success:
-            self._complete = True
-            self.status_label.setText("✓ All packages installed!")
-            self.status_label.setStyleSheet("color: #a55eea; font-size: 12px; font-weight: bold;")
-            self.install_complete.emit()
-
-    def is_complete(self):
-        return self._complete
+        # No-op for this page now
+        self.install_complete.emit()
 

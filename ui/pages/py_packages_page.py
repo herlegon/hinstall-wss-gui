@@ -15,9 +15,11 @@ from .base_page import BasePage
 
 class PyPackagesPage(BasePage):
     install_complete = Signal()
+    log_message = Signal(str)
 
-    def __init__(self):
+    def __init__(self, parent=None):
         super().__init__(
+            parent,
             "Python Packages",
             "Installing Python dependencies via package manager."
         )
@@ -29,24 +31,35 @@ class PyPackagesPage(BasePage):
         self.progress_bar = StyledProgressBar("#1dd1a1")
         self.layout.addWidget(self.progress_bar)
 
-        log_label = QLabel("Installation Log")
-        log_label.setStyleSheet("color: #888; font-size: 12px; margin-top: 10px;")
-        self.layout.addWidget(log_label)
-
-        self.log_output = QTextEdit()
-        self.log_output.setReadOnly(True)
-        self.log_output.setStyleSheet("""
-            QTextEdit {
-                background-color: #0f0f1a;
-                color: #1dd1a1;
-                border: 1px solid #2d2d44;
-                border-radius: 8px;
-                padding: 12px;
-                font-family: 'Consolas', monospace;
-                font-size: 11px;
+        # Update Checkbox (Moved from Page 1)
+        cb_style = """
+            QCheckBox {
+                color: #fff;
+                font-size: 14px;
+                font-weight: bold;
+                spacing: 10px;
             }
-        """)
-        self.layout.addWidget(self.log_output)
+            QCheckBox::indicator {
+                width: 20px;
+                height: 20px;
+                border-radius: 4px;
+                border: 2px solid #3d3d5c;
+                background-color: #1a1a2e;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #667eea;
+                border-color: #667eea;
+            }
+            QCheckBox::indicator:hover {
+                border-color: #667eea;
+            }
+        """
+        self.auto_update_cb = QCheckBox("Keep the computational resources up to date")
+        self.auto_update_cb.setChecked(True)
+        self.auto_update_cb.setStyleSheet(cb_style)
+        self.layout.addWidget(self.auto_update_cb)
+
+        self.layout.addStretch()
 
         self.sim_timer = None
 
@@ -55,9 +68,9 @@ class PyPackagesPage(BasePage):
         self.sim_index = 0
         self.sim_packages = packages
 
-        self.log_output.append("[WebSocket] Connecting to ws://localhost:8765...")
-        self.log_output.append("[WebSocket] Connection established")
-        self.log_output.append("[System] Starting package installation...\n")
+        self.log_message.emit("[WebSocket] Connecting to ws://localhost:8765...")
+        self.log_message.emit("[WebSocket] Connection established")
+        self.log_message.emit("[System] Starting package installation...\n")
 
         self.sim_timer = QTimer(self)
         self.sim_timer.timeout.connect(self._sim_step)
@@ -69,8 +82,9 @@ class PyPackagesPage(BasePage):
             self.sim_timer.stop()
             self.status_label.setText("✓ All packages installed!")
             self.status_label.setStyleSheet("color: #1dd1a1; font-size: 14px; font-weight: bold;")
+            self.status_label.setStyleSheet("color: #1dd1a1; font-size: 14px; font-weight: bold;")
             self.progress_bar.setValue(100)
-            self.log_output.append("\n[System] Installation complete!")
+            self.log_message.emit("\n[System] Installation complete!")
             self.install_complete.emit()
             return
 
@@ -82,10 +96,10 @@ class PyPackagesPage(BasePage):
         self.progress_bar.setValue(progress)
 
         if step == 0:
-            self.log_output.append(f"[pip] Installing {pkg}...")
+            self.log_message.emit(f"[pip] Installing {pkg}...")
             self.status_label.setText(f"Installing {pkg}...")
         elif step == 4:
-            self.log_output.append(f"[pip] ✓ Successfully installed {pkg}")
+            self.log_message.emit(f"[pip] ✓ Successfully installed {pkg}")
 
         self.sim_index += 1
 

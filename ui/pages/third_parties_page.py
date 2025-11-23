@@ -16,8 +16,9 @@ from .base_page import BasePage
 class ThirdPartiesPage(BasePage):
     install_complete = Signal()
 
-    def __init__(self):
+    def __init__(self, parent=None):
         super().__init__(
+            parent,
             "Installing FFmpeg",
             "Downloading and configuring FFmpeg..."
         )

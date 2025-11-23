@@ -11,14 +11,13 @@ from PySide6.QtGui import QFont, QColor, QIcon, QPainter, QPainterPath, QRegion
 
 from components.styled_button import StyledButton
 
-from pages.ffmpeg_page import FFmpegPage
+from pages.ffmpeg_selection_page import FFmpegSelectionPage
 from pages.py_packages_page import PyPackagesPage
 from pages.third_parties_page import ThirdPartiesPage
-from pages.backend_page import PythonInstallPage
+from pages.backend_page import BackendInstallPage
 from pages.settings_page import SettingsPage
 
 from components.title_bar import TitleBar
-
 
 
 # add this folder
@@ -66,8 +65,11 @@ class InstallerWindow(QMainWindow):
         step_layout = QHBoxLayout(self.step_indicator)
         step_layout.setContentsMargins(40, 0, 40, 0)
 
+        # Start backend and get list of packages
+
+
         self.step_labels = []
-        steps = ["Python", "Settings", "FFmpeg", "Download", "Packages"]
+        steps = ["Welcome", "FFmpeg Notice & Selection", "Third parties", "Processing Server", "AI Computational Resource"]
         for i, name in enumerate(steps):
             lbl = QLabel(f"{i+1}. {name}")
             lbl.setStyleSheet("color: #444; font-size: 12px;")
@@ -78,15 +80,24 @@ class InstallerWindow(QMainWindow):
         self._update_step_indicator(0)
         content_layout.addWidget(self.step_indicator)
 
+        self.back_btn = StyledButton("← Back")
+        self.back_btn.clicked.connect(self._go_back)
+        self.back_btn.setEnabled(False)
+
+        self.next_btn = StyledButton("Next →", primary=True)
+        self.next_btn.clicked.connect(self._go_next)
+        self.next_btn.setEnabled(False)
+
+
         # Pages
         self.stack = QStackedWidget()
         self.stack.setStyleSheet("background-color: #1a1a2e;")
 
-        self.page1 = SettingsPage()
-        self.page2 = PythonInstallPage()
-        self.page3 = FFmpegPage()
-        self.page4 = ThirdPartiesPage()
-        self.page5 = PyPackagesPage()
+        self.page1 = SettingsPage(self)
+        self.page2 = FFmpegSelectionPage(self)
+        self.page3 = BackendInstallPage(self)
+        self.page4 = ThirdPartiesPage(self)
+        self.page5 = PyPackagesPage(self)
 
         self.stack.addWidget(self.page1)
         self.stack.addWidget(self.page2)
@@ -104,15 +115,62 @@ class InstallerWindow(QMainWindow):
         nav_layout = QHBoxLayout(nav)
         nav_layout.setContentsMargins(30, 0, 30, 0)
 
-        # self.back_btn = StyledButton("← Back")
-        # self.back_btn.clicked.connect(self._go_back)
-        # self.back_btn.setEnabled(False)
 
-        self.next_btn = StyledButton("Next →", primary=True)
-        self.next_btn.clicked.connect(self._go_next)
-        self.next_btn.setEnabled(False)
+        # Log Section (Button + Viewer)
+        self.log_container = QWidget()
+        self.log_layout = QVBoxLayout(self.log_container)
+        self.log_layout.setContentsMargins(20, 0, 20, 10) # Padding: Left, Top, Right, Bottom
+        self.log_layout.setSpacing(5)
 
-        # nav_layout.addWidget(self.back_btn)
+        # Log Toggle Button
+        self.log_btn = QPushButton("Show Log")
+        self.log_btn.setCheckable(True)
+        self.log_btn.setFixedWidth(100)
+        self.log_btn.setStyleSheet("""
+            QPushButton {
+                color: #666;
+                background: transparent;
+                border: 1px solid #333;
+                border-radius: 4px;
+                padding: 5px 10px;
+                font-size: 11px;
+                text-align: left;
+            }
+            QPushButton:checked {
+                background-color: #2d2d44;
+                color: #ccc;
+                border-color: #444;
+            }
+            QPushButton:hover {
+                border-color: #555;
+                color: #888;
+            }
+        """)
+        self.log_btn.clicked.connect(self._toggle_log)
+        self.log_layout.addWidget(self.log_btn)
+
+        # Log Viewer
+        self.log_viewer = QTextEdit()
+        self.log_viewer.setReadOnly(True)
+        self.log_viewer.setVisible(False)
+        self.log_viewer.setFixedHeight(150)
+        self.log_viewer.setStyleSheet("""
+            QTextEdit {
+                background-color: #0f0f1a;
+                color: #aaa;
+                border: 1px solid #2d2d44;
+                border-radius: 8px;
+                font-family: 'Consolas', monospace;
+                font-size: 11px;
+                padding: 10px;
+            }
+        """)
+        self.log_layout.addWidget(self.log_viewer)
+
+        # Insert before nav
+        main_layout.insertWidget(2, self.log_container)
+
+        nav_layout.addWidget(self.back_btn)
         nav_layout.addStretch()
         nav_layout.addWidget(self.next_btn)
 
@@ -121,8 +179,13 @@ class InstallerWindow(QMainWindow):
         # Signals
         self.page1.install_complete.connect(lambda: self.next_btn.setEnabled(True))
         self.page2.install_complete.connect(lambda: self.next_btn.setEnabled(True))
+        self.page3.install_complete.connect(self._go_next)
         self.page4.install_complete.connect(lambda: self.next_btn.setEnabled(True))
         self.page5.install_complete.connect(self._on_complete)
+
+        # Log Signals
+        if hasattr(self.page5, 'log_message'):
+            self.page5.log_message.connect(self._append_log)
 
         # Start
         QTimer.singleShot(500, self.page1.start_installation)
@@ -139,16 +202,15 @@ class InstallerWindow(QMainWindow):
     def _go_next(self):
         current = self.stack.currentIndex()
 
-        if current == 2:
-            version, path = self.page3.get_selection()
-            if version == "custom" and not path:
-                return
-            self.stack.setCurrentIndex(3)
-            self._update_step_indicator(3)
-            self.page4.start_installation(version, path)
-            self.next_btn.setEnabled(False)
-            self.back_btn.setEnabled(True)
-            return
+        # if current == 2:
+        #     version, path = self.page2.get_selection()
+        #     if version == "custom" and not path:
+        #         return
+        #     self.stack.setCurrentIndex(3)
+        #     self._update_step_indicator(3)
+        #     self.page3.start_installation(version, path)
+        #     self.next_btn.setEnabled(True)
+        #     return
 
         if current < self.stack.count() - 1:
             self.stack.setCurrentIndex(current + 1)
@@ -156,9 +218,9 @@ class InstallerWindow(QMainWindow):
             self.back_btn.setEnabled(True)
 
             if current + 1 == 1:
-                self.page2.start_installation()
                 self.next_btn.setEnabled(False)
             elif current + 1 == 2:
+                # self.page2.start_installation()
                 self.next_btn.setEnabled(True)
             elif current + 1 == 4:
                 self.page5.start_installation()
@@ -181,7 +243,20 @@ class InstallerWindow(QMainWindow):
         self.next_btn.clicked.disconnect()
         self.next_btn.clicked.connect(self.close)
 
+    def _toggle_log(self, checked):
+        self.log_viewer.setVisible(checked)
+        if checked:
+            self.log_btn.setText("Hide Log")
+            self.setFixedSize(750, 760) # Expand window (more height for button + log + padding)
+        else:
+            self.log_btn.setText("Show Log")
+            self.setFixedSize(750, 580) # Restore size
 
+    def _append_log(self, message):
+        self.log_viewer.append(message)
+        # Auto-scroll
+        sb = self.log_viewer.verticalScrollBar()
+        sb.setValue(sb.maximum())
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")

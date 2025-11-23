@@ -1,0 +1,5 @@
+# style_config.yaml
+window_bgd: "#1a1a1a"
+hbutton:
+  normal: "#FF0000"
+  hover: "#FF5555"

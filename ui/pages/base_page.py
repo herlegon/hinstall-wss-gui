@@ -13,9 +13,11 @@ from install_workers import InstallWorker
 from components.styled_progress_bar import StyledProgressBar
 
 class BasePage(QWidget):
-    def __init__(self, title, subtitle=""):
-        super().__init__()
+    def __init__(self, parent: QWidget | None = ..., title="", subtitle=""):
+        super().__init__(parent=parent)
         self.setStyleSheet("background-color: transparent;")
+
+        self.main_window = parent
 
         self.layout = QVBoxLayout(self)
         self.layout.setSpacing(15)
