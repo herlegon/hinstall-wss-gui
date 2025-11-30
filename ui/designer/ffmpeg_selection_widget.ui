@@ -6,76 +6,94 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>549</width>
-    <height>516</height>
+    <width>541</width>
+    <height>461</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <property name="styleSheet">
-   <string notr="true"> background-color: rgb(37, 37, 40); </string>
-  </property>
   <layout class="QVBoxLayout" name="verticalLayout">
-   <property name="spacing">
-    <number>18</number>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
    </property>
    <item>
-    <widget class="HTitle1" name="title">
-     <property name="text" stdset="0">
-      <string>FFmpeg selection</string>
+    <widget class="QLabel" name="h_title">
+     <property name="text">
+      <string>FFmpeg notice &amp; selection</string>
      </property>
     </widget>
    </item>
    <item>
-    <layout class="QGridLayout" name="gridLayout">
-     <item row="0" column="1">
-      <widget class="HLabel" name="h_label">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">QLabel {
-    background-color: transparent;
-    color: #d4d4d8;
-    font-family: &quot;Segoe UI&quot;, &quot;Sans Serif&quot;;
-    font-size: 12pt;
-    margin: 0px;
-    padding: 0px;
-}
-
-
-QLabel:disabled {
-    color: #4E4E4E;
-}
-</string>
-       </property>
+    <widget class="QLabel" name="h_stubtitle">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>24</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>24</height>
+      </size>
+     </property>
+     <property name="text">
+      <string>Select which FFmpeg build to use for media processing.</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Orientation::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Policy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>12</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <layout class="QVBoxLayout" name="minimal_layout">
+     <property name="spacing">
+      <number>0</number>
+     </property>
+     <item>
+      <widget class="HRadioButton" name="h_radio_button_minimal">
        <property name="text">
-        <string>Minimal FFmpeg (Recommended)</string>
+        <string>Minimal FFmpeg</string>
        </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+       <attribute name="buttonGroup">
+        <string notr="true">group_ffmpeg</string>
+       </attribute>
       </widget>
      </item>
-     <item row="1" column="1">
+     <item>
       <widget class="HLabel" name="h_label_4">
-       <property name="styleSheet">
-        <string notr="true">QLabel {
-    background-color: transparent;
-    color: #999;
-    font-family: &quot;Segoe UI&quot;, &quot;Sans Serif&quot;;
-    font-size: 10pt;
-    margin: 0px;
-    padding: 0px;
-}
-
-
-QLabel:disabled {
-    color: #4E4E4E;
-}
-</string>
-       </property>
        <property name="text">
         <string>Free codecs included: AV1, VP8, VP9, DNxHD, Vorbis, Opus, FLAC, PCM.
 H.264/H.265 decoding included for playback support.
@@ -83,21 +101,36 @@ Hardware-accelerated H.264/H.265 encoders (requires an NVIDIA GPU).
 Does NOT include software H.264/H.265, AAC, or MP3 encoders.
 Safe for personal or commercial use without additional licenses.</string>
        </property>
-      </widget>
-     </item>
-     <item row="0" column="0">
-      <widget class="HRadioButton" name="h_radio_button">
-       <property name="text">
-        <string>RadioButton</string>
+       <property name="indent">
+        <number>40</number>
        </property>
       </widget>
      </item>
     </layout>
    </item>
    <item>
-    <layout class="QGridLayout" name="gridLayout_2">
-     <item row="1" column="1">
+    <layout class="QVBoxLayout" name="third_party_layout">
+     <item>
+      <widget class="HRadioButton" name="h_radio_button_third_party">
+       <property name="text">
+        <string>Download FFmpeg from a third-party</string>
+       </property>
+       <property name="checked">
+        <bool>false</bool>
+       </property>
+       <attribute name="buttonGroup">
+        <string notr="true">group_ffmpeg</string>
+       </attribute>
+      </widget>
+     </item>
+     <item>
       <widget class="HLabel" name="h_label_5">
+       <property name="font">
+        <font>
+         <family>Segoe UI</family>
+         <pointsize>10</pointsize>
+        </font>
+       </property>
        <property name="styleSheet">
         <string notr="true">QLabel {
     background-color: transparent;
@@ -119,47 +152,33 @@ QLabel:disabled {
 Provided by a third party (e.g., BtbN). You are responsible for any licenses or patents.
 Commercial use may require separate patent licenses.</string>
        </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="HLabel" name="h_label_3">
-       <property name="styleSheet">
-        <string notr="true">QLabel {
-    background-color: transparent;
-    color: #d4d4d8;
-    font-family: &quot;Segoe UI&quot;, &quot;Sans Serif&quot;;
-    font-size: 12pt;
-    margin: 0px;
-    padding: 0px;
-}
-
-
-QLabel:disabled {
-    color: #4E4E4E;
-}
-</string>
-       </property>
-       <property name="text">
-        <string>Download FFmpeg from a third-party</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="0">
-      <widget class="HRadioButton" name="h_radio_button_2">
-       <property name="text">
-        <string/>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
+       <property name="indent">
+        <number>40</number>
        </property>
       </widget>
      </item>
     </layout>
    </item>
    <item>
-    <layout class="QGridLayout" name="gridLayout_3">
-     <item row="1" column="1">
+    <layout class="QVBoxLayout" name="installed_ffmpeg">
+     <item>
+      <widget class="HRadioButton" name="h_radio_button_installed">
+       <property name="text">
+        <string>Use an existing FFmpeg on your system</string>
+       </property>
+       <attribute name="buttonGroup">
+        <string notr="true">group_ffmpeg</string>
+       </attribute>
+      </widget>
+     </item>
+     <item>
       <widget class="HLabel" name="h_label_6">
+       <property name="font">
+        <font>
+         <family>Segoe UI</family>
+         <pointsize>10</pointsize>
+        </font>
+       </property>
        <property name="styleSheet">
         <string notr="true">QLabel {
     background-color: transparent;
@@ -180,51 +199,33 @@ QLabel:disabled {
         <string>Select a pre-installed FFmpeg binary. Your software will call it externally.
 You are responsible for license and patent compliance, including commercial use.</string>
        </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="HLabel" name="h_label_2">
-       <property name="styleSheet">
-        <string notr="true">QLabel {
-    background-color: transparent;
-    color: #d4d4d8;
-    font-family: &quot;Segoe UI&quot;, &quot;Sans Serif&quot;;
-    font-size: 12pt;
-    margin: 0px;
-    padding: 0px;
-}
-
-
-QLabel:disabled {
-    color: #4E4E4E;
-}
-</string>
-       </property>
-       <property name="text">
-        <string>Use an existing FFmpeg on your system</string>
+       <property name="indent">
+        <number>40</number>
        </property>
       </widget>
      </item>
-     <item row="0" column="0">
-      <widget class="HRadioButton" name="h_radio_button_3">
-       <property name="text">
-        <string/>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="1">
+     <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
+       <property name="leftMargin">
+        <number>40</number>
+       </property>
        <item>
-        <widget class="HButton" name="h_button">
+        <widget class="HLineEdit" name="h_line_edit_ffmpeg_dir">
          <property name="text">
-          <string>Select...</string>
+          <string>No file selected</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="HLineEdit" name="h_line_edit">
+        <widget class="QPushButton" name="h_icon_button_browse">
+         <property name="maximumSize">
+          <size>
+           <width>24</width>
+           <height>16777215</height>
+          </size>
+         </property>
          <property name="text">
-          <string>No file selected</string>
+          <string>...</string>
          </property>
         </widget>
        </item>
@@ -252,7 +253,7 @@ QLabel:disabled {
      </property>
      <property name="text">
       <string>**Disclaimer:**
-Neither Herlogon nor their developers is not responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.</string>
+Neither Herlogon nor their developers is responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
@@ -262,11 +263,6 @@ Neither Herlogon nor their developers is not responsible for the choice of FFmpe
   </layout>
  </widget>
  <customwidgets>
-  <customwidget>
-   <class>HButton</class>
-   <extends>QPushButton</extends>
-   <header>hwidgets</header>
-  </customwidget>
   <customwidget>
    <class>HLabel</class>
    <extends>QLabel</extends>
@@ -282,12 +278,10 @@ Neither Herlogon nor their developers is not responsible for the choice of FFmpe
    <extends>QRadioButton</extends>
    <header>hwidgets</header>
   </customwidget>
-  <customwidget>
-   <class>HTitle1</class>
-   <extends>QWidget</extends>
-   <header>hwidgets</header>
-  </customwidget>
  </customwidgets>
  <resources/>
  <connections/>
+ <buttongroups>
+  <buttongroup name="group_ffmpeg"/>
+ </buttongroups>
 </ui>
