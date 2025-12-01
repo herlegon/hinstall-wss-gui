@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>638</width>
-    <height>529</height>
+    <width>500</width>
+    <height>464</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -120,6 +120,12 @@ Safe for personal or commercial use without additional licenses.</string>
        </item>
        <item alignment="Qt::AlignmentFlag::AlignTop">
         <widget class="QLabel" name="comment_third_party">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
          <property name="text">
           <string>Includes full software H.264/H.265/AAC/MP3 encoders (GPL and patent-encumbered).
 Provided by a third party (e.g., BtbN). You are responsible for any licenses or patents.

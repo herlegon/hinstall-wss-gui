@@ -67,7 +67,7 @@ class Ui_FFmpegSelectionWidget(object):
     def setupUi(self, FFmpegSelectionWidget, theme: Type[Theme]):
         if not FFmpegSelectionWidget.objectName():
             FFmpegSelectionWidget.setObjectName(u"FFmpegSelectionWidget")
-        FFmpegSelectionWidget.resize(638, 529)
+        FFmpegSelectionWidget.resize(500, 464)
         self.main_layout = QVBoxLayout(FFmpegSelectionWidget)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -125,6 +125,11 @@ class Ui_FFmpegSelectionWidget(object):
 
         self.comment_third_party = HComment(FFmpegSelectionWidget, theme=theme)
         self.comment_third_party.setObjectName(u"comment_third_party")
+        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        sizePolicy1.setHorizontalStretch(0)
+        sizePolicy1.setVerticalStretch(0)
+        sizePolicy1.setHeightForWidth(self.comment_third_party.sizePolicy().hasHeightForWidth())
+        self.comment_third_party.setSizePolicy(sizePolicy1)
         self.comment_third_party.setIndent(40)
 
         self.third_party_layout.addWidget(self.comment_third_party, 0, Qt.AlignmentFlag.AlignTop)

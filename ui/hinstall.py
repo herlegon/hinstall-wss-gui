@@ -30,8 +30,8 @@ def main():
     args = parser.parse_args()
 
 
-    application = QApplication(sys.argv)
     QApplication.setStyle("Fusion")
+    application = QApplication(sys.argv)
 
 
     # from install.splash import run_installer_and_wait

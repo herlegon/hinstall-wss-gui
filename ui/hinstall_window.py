@@ -78,6 +78,9 @@ class InstallerWindow(QMainWindow):
         content_vpadding: int = 16
         for p in self.pages:
             p.setMainLayoutSpacing(12)
+            p.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+            p.show()
+            p.updateGeometry()
 
         # Frameless
         self.setWindowFlags(Qt.FramelessWindowHint)
@@ -146,7 +149,7 @@ class InstallerWindow(QMainWindow):
         self.stack.setSizePolicy(
             self.stack.sizePolicy().horizontalPolicy(), QSizePolicy.Policy.Minimum
         )
-        
+
         # Set the stack to resize to the current widget's size
         from PySide6.QtWidgets import QLayout
         if self.stack.layout():
@@ -155,10 +158,10 @@ class InstallerWindow(QMainWindow):
         self.stack.setStyleSheet(f"background-color: {theme.window_bgd};")
         for p in self.pages:
             self.stack.addWidget(p)
-        
+
         # Update sizing when page changes
-        self.stack.currentChanged.connect(self._update_stack_sizing)
-        
+        # self.stack.currentChanged.connect(self._update_stack_sizing)
+
         content_layout.addWidget(self.stack)
 
 
@@ -228,7 +231,7 @@ class InstallerWindow(QMainWindow):
         self.stack.setCurrentIndex(self.current_index)
 
         # Adjust window size to fit content
-        self._update_stack_sizing()
+        # self._update_stack_sizing()
         self.adjustSize()
 
 
@@ -269,7 +272,7 @@ class InstallerWindow(QMainWindow):
             else:
                 widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
                 widget.hide() # Explicitly hide, though stack does this
-        
+
         # Force stack to recalculate
         self.stack.adjustSize()
         self.stack.updateGeometry()
@@ -306,7 +309,7 @@ class InstallerWindow(QMainWindow):
             self.info.setVisible(True)
         else:
             self.info.setVisible(False)
-        
+
         # Resize window to fit the new page
         self.adjustSize()
 
@@ -317,7 +320,7 @@ class InstallerWindow(QMainWindow):
             self.stack.setCurrentIndex(current)
             self.step_indicator.setCurrentStep(current)
             self.current_index = current
-            
+
             # Resize window to fit the new page
             self.adjustSize()
 
