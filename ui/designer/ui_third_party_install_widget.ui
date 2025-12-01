@@ -6,16 +6,38 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>546</width>
-    <height>183</height>
+    <width>528</width>
+    <height>219</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QVBoxLayout" name="main_layout">
+   <property name="spacing">
+    <number>16</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
    <item>
-    <widget class="QLabel" name="h_title">
+    <widget class="QLabel" name="title">
+     <property name="text">
+      <string>Third-party software</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="subtitle">
      <property name="text">
       <string>Download and installation of third parties software</string>
      </property>
@@ -74,7 +96,7 @@
       </layout>
      </item>
      <item>
-      <widget class="QProgressBar" name="h_progress_bar">
+      <widget class="QProgressBar" name="progress_bar">
        <property name="value">
         <number>24</number>
        </property>
@@ -88,7 +110,7 @@
        <property name="sizeHint" stdset="0">
         <size>
          <width>20</width>
-         <height>40</height>
+         <height>0</height>
         </size>
        </property>
       </spacer>

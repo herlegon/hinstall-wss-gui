@@ -6,14 +6,17 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>546</width>
-    <height>253</height>
+    <width>987</width>
+    <height>231</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QVBoxLayout" name="main_layout">
+   <property name="spacing">
+    <number>16</number>
+   </property>
    <property name="leftMargin">
     <number>0</number>
    </property>
@@ -27,43 +30,24 @@
     <number>0</number>
    </property>
    <item>
-    <widget class="QLabel" name="h_title">
+    <widget class="QLabel" name="title">
      <property name="text">
       <string>Installation of the processing server</string>
      </property>
     </widget>
    </item>
    <item>
-    <widget class="QLabel" name="h_stubtitle">
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>48</height>
-      </size>
-     </property>
+    <widget class="QLabel" name="subtitle">
      <property name="text">
       <string>This software is a framework in charge of converting models, processing images, video. It uses the Computational Resources available on your system.</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
      </property>
     </widget>
-   </item>
-   <item>
-    <spacer name="verticalSpacer_3">
-     <property name="orientation">
-      <enum>Qt::Orientation::Vertical</enum>
-     </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Fixed</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>12</height>
-      </size>
-     </property>
-    </spacer>
    </item>
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -99,7 +83,7 @@
       </layout>
      </item>
      <item>
-      <widget class="QProgressBar" name="h_progress_bar">
+      <widget class="QProgressBar" name="progress_bar">
        <property name="value">
         <number>24</number>
        </property>
@@ -115,7 +99,7 @@
      <property name="sizeHint" stdset="0">
       <size>
        <width>20</width>
-       <height>40</height>
+       <height>0</height>
       </size>
      </property>
     </spacer>
