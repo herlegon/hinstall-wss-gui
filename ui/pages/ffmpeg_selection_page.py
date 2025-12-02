@@ -52,6 +52,7 @@ class FFmpegSelectionPage(BasePage, Ui_FFmpegSelectionWidget):
         # self.updateGeometry()
 
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        self.set_has_progress_bar(False)  # No progress bar on this page
         # self.show()
         # self.updateGeometry()
 
@@ -89,4 +90,9 @@ class FFmpegSelectionPage(BasePage, Ui_FFmpegSelectionWidget):
         return {
             'selection': self.get_selection(),
         }
+
+
+    def get_result(self) -> dict:
+        return self.get_user_settings()
+
 

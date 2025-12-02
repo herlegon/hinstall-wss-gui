@@ -33,7 +33,10 @@ from hwidgets import (
     HStrongGreyButton,
     HFramelessButton,
     HLogViewer,
+    HProgressBar,
 )
+from PySide6.QtWidgets import QDialog, QLabel
+from .install_workers import CleanupWorker
 
 from .title_bar import TitleBar
 
@@ -239,6 +242,9 @@ class InstallerWindow(QMainWindow):
         # Signals
         for p in self.pages:
             p.completed.connect(partial(self.slot_task_completed, p))
+        
+        # Track all installed files across all pages
+        self.all_installed_files: list[str] = []
         # self.page2.install_complete.connect(lambda: self.next_button.setEnabled(True))
         # self.page3.install_complete.connect(self._go_next)
         # self.page4.install_complete.connect(lambda: self.next_button.setEnabled(True))
@@ -280,28 +286,43 @@ class InstallerWindow(QMainWindow):
 
 
     def slot_task_completed(self, p: Type[BasePage], result: bool) -> None:
+        """Handle task completion from a page."""
         if not result:
-            print("Error")
-            #show dialog
-
+            print("Error during installation")
+            # TODO: show error dialog
+            self.next_button.setEnabled(False)
         else:
+            # Track files installed by this page
+            files = p.get_installed_files()
+            self.all_installed_files.extend(files)
+            print(f"Page completed. Installed files: {files}")
+            
+            # Enable next button
             self.next_button.setEnabled(True)
 
 
 
     def slot_go_next(self):
+        """Handle next button click."""
         current = self.stack.currentIndex()
         if current >= self.stack.count() - 1:
             self.close()
             return
 
         if current < self.stack.count() - 1:
-            self.stack.setCurrentIndex(current + 1)
+            current += 1
+            self.stack.setCurrentIndex(current)
             self.cancel_button.setEnabled(True)
             self.cancel_button.setVisible(True)
 
+        # Check if new page has progress bar
+        current_page = self.pages[current]
+        if current_page.has_progress_bar():
+            # Disable next button until installation completes
+            self.next_button.setEnabled(False)
+        else:
+            # No progress bar, next button stays enabled
             self.next_button.setEnabled(True)
-            current += 1
 
         if current >= self.stack.count() - 1:
             self.cancel_button.setEnabled(False)
@@ -312,8 +333,6 @@ class InstallerWindow(QMainWindow):
             self.cancel_button.setEnabled(True)
             self.cancel_button.setVisible(True)
 
-
-        self.stack.setCurrentIndex(current)
         self.step_indicator.setCurrentStep(current)
         self.current_index = current
         if current == 0:
@@ -325,15 +344,88 @@ class InstallerWindow(QMainWindow):
         self.adjustSize()
 
     def slot_cancel(self):
-        current = self.stack.currentIndex()
-        if current > 0:
-            current -= 1
-            self.stack.setCurrentIndex(current)
-            self.step_indicator.setCurrentStep(current)
-            self.current_index = current
+        """Handle cancel button click with confirmation."""
+        from PySide6.QtWidgets import QMessageBox
+        
+        # Show confirmation dialog
+        theme = self.theme if hasattr(self, 'theme') else StyleManager().get_theme()
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Cancel Installation")
+        msg_box.setText("Are you sure you want to cancel the installation?")
+        msg_box.setInformativeText("This will stop the current process and remove all installed files.")
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.setDefaultButton(QMessageBox.No)
+        
+        result = msg_box.exec()
+        
+        if result == QMessageBox.Yes:
+            # Cancel any running workers
+            current_page = self.pages[self.current_index]
+            current_page.cancel_worker()
+            
+            # Show cleanup dialog
+            self._show_cleanup_dialog()
 
-            # Resize window to fit the new page
-            self.adjustSize()
+
+    def _show_cleanup_dialog(self):
+        """Show a dialog with progress bar while cleaning up installed files."""
+        theme = StyleManager().get_theme()
+        
+        # Create cleanup dialog
+        cleanup_dialog = QDialog(self)
+        cleanup_dialog.setWindowTitle("Cleaning Up")
+        cleanup_dialog.setModal(True)
+        cleanup_dialog.setFixedSize(400, 150)
+        
+        # Dialog layout
+        dialog_layout = QVBoxLayout(cleanup_dialog)
+        dialog_layout.setContentsMargins(24, 24, 24, 24)
+        dialog_layout.setSpacing(16)
+        
+        # Status label
+        status_label = QLabel("Removing installed files...")
+        dialog_layout.addWidget(status_label)
+        
+        # Progress bar
+        progress_bar = HProgressBar(cleanup_dialog, theme=theme)
+        progress_bar.setValue(0)
+        dialog_layout.addWidget(progress_bar)
+        
+        # File count label
+        file_count_label = QLabel(f"0 / {len(self.all_installed_files)} files removed")
+        dialog_layout.addWidget(file_count_label)
+        
+        # Create cleanup worker
+        cleanup_worker = CleanupWorker(self.all_installed_files)
+        
+        # Connect signals
+        def update_progress(value):
+            progress_bar.setValue(value)
+            removed = int(value * len(self.all_installed_files) / 100)
+            file_count_label.setText(f"{removed} / {len(self.all_installed_files)} files removed")
+        
+        cleanup_worker.progress.connect(update_progress)
+        cleanup_worker.status.connect(status_label.setText)
+        cleanup_worker.finished_signal.connect(lambda success: self._on_cleanup_finished(cleanup_dialog, success))
+        
+        # Start cleanup
+        cleanup_worker.start()
+        
+        # Show dialog
+        cleanup_dialog.exec()
+    
+    
+    def _on_cleanup_finished(self, dialog: QDialog, success: bool):
+        """Handle cleanup completion."""
+        if success:
+            # Close the dialog
+            dialog.accept()
+            # Close the installer window
+            self.close()
+        else:
+            # Show error but still close
+            dialog.accept()
+            self.close()
 
 
     def _on_complete(self):
@@ -355,3 +447,4 @@ class InstallerWindow(QMainWindow):
         # Auto-scroll
         sb = self.log_viewer.verticalScrollBar()
         sb.setValue(sb.maximum())
+
