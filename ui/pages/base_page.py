@@ -1,4 +1,5 @@
-from typing import Type
+from abc import ABC, abstractmethod
+from typing import Any, Type
 from PySide6.QtCore import (
     Signal,
 )
@@ -13,7 +14,9 @@ from hwidgets import (
 
 
 
-class BasePage(QWidget):
+class BasePage(QWidget, ABC):
+    completed: Signal = Signal(bool)
+
     def __init__(
         self,
         parent: QMainWindow,
@@ -33,3 +36,10 @@ class BasePage(QWidget):
 
     def setMainLayoutSpacing(self, spacing: int) -> None:
         self.main_layout.setSpacing(spacing)
+
+
+    @abstractmethod
+    def get_result(self) -> dict[str, Any]:
+        """return a dict of settings
+        """
+        pass

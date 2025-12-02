@@ -67,7 +67,7 @@ class Ui_FFmpegSelectionWidget(object):
     def setupUi(self, FFmpegSelectionWidget, theme: Type[Theme]):
         if not FFmpegSelectionWidget.objectName():
             FFmpegSelectionWidget.setObjectName(u"FFmpegSelectionWidget")
-        FFmpegSelectionWidget.resize(500, 464)
+        FFmpegSelectionWidget.resize(640, 561)
         self.main_layout = QVBoxLayout(FFmpegSelectionWidget)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -177,14 +177,18 @@ class Ui_FFmpegSelectionWidget(object):
 
         self.selection_layout.addLayout(self.installed_ffmpeg)
 
+        self.verticalSpacer = QSpacerItem(20, 16, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
-        self.main_layout.addLayout(self.selection_layout)
+        self.selection_layout.addItem(self.verticalSpacer)
 
         self.disclaimer = HLabel(FFmpegSelectionWidget, theme=theme)
         self.disclaimer.setObjectName(u"disclaimer")
         self.disclaimer.setWordWrap(True)
 
-        self.main_layout.addWidget(self.disclaimer)
+        self.selection_layout.addWidget(self.disclaimer)
+
+
+        self.main_layout.addLayout(self.selection_layout)
 
 
         self.retranslateUi(FFmpegSelectionWidget)

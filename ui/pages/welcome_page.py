@@ -44,3 +44,6 @@ class WelcomePage(BasePage, Ui_WelcomeWidget):
 
     def slot_select_dir(self):
         print("select directory")
+
+
+    def

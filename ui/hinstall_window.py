@@ -1,4 +1,5 @@
 from argparse import Namespace
+from functools import partial
 from pathlib import Path
 from pprint import pprint
 import sys
@@ -199,7 +200,7 @@ class InstallerWindow(QMainWindow):
         self.log_container.setStyleSheet(f"background-color: {theme.window_bgd}")
         self.log_layout = QVBoxLayout(self.log_container)
         self.log_layout.setContentsMargins(
-            content_hpadding, 0, 0, 4
+            content_hpadding, 8, 0, 4
         )
         self.log_layout.setSpacing(4)
 
@@ -226,7 +227,7 @@ class InstallerWindow(QMainWindow):
 
 
         # Initial
-        self.current_index: int = 1
+        self.current_index: int = 0
         self.step_indicator.setCurrentStep(self.current_index)
         self.stack.setCurrentIndex(self.current_index)
 
@@ -235,8 +236,9 @@ class InstallerWindow(QMainWindow):
         self.adjustSize()
 
 
-        # # Signals
-        # self.page1.install_complete.connect(lambda: self.next_button.setEnabled(True))
+        # Signals
+        for p in self.pages:
+            p.completed.connect(partial(self.slot_task_completed, p))
         # self.page2.install_complete.connect(lambda: self.next_button.setEnabled(True))
         # self.page3.install_complete.connect(self._go_next)
         # self.page4.install_complete.connect(lambda: self.next_button.setEnabled(True))
@@ -261,7 +263,6 @@ class InstallerWindow(QMainWindow):
 
 
 
-
     def _update_stack_sizing(self, index=None):
         for i in range(self.stack.count()):
             widget = self.stack.widget(i)
@@ -276,6 +277,16 @@ class InstallerWindow(QMainWindow):
         # Force stack to recalculate
         self.stack.adjustSize()
         self.stack.updateGeometry()
+
+
+    def slot_task_completed(self, p: Type[BasePage], result: bool) -> None:
+        if not result:
+            print("Error")
+            #show dialog
+
+        else:
+            self.next_button.setEnabled(True)
+
 
 
     def slot_go_next(self):
