@@ -27,7 +27,6 @@ class WelcomePage(BasePage, Ui_WelcomeWidget):
         super().__init__(parent=parent, theme=theme)
         self.setupUi(self, theme=theme)
         self._step_label = f"Welcome"
-        self.set_has_progress_bar(False)  # No progress bar on this page
 
         self.checkbox_custom_dir.setEnabled(False)
         self.icon_button_browse.setEnabled(False)
@@ -45,8 +44,8 @@ class WelcomePage(BasePage, Ui_WelcomeWidget):
 
     def slot_select_dir(self):
         print("select directory")
-    
-    
+
+
     def get_result(self) -> dict:
         return self.get_user_settings()
 

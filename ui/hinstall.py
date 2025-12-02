@@ -42,6 +42,11 @@ def main():
     #     rehost_dir=None,
     # )
 
+    from PySide6.QtGui import QFont
+    default_font = application.font()
+    default_font.setStyleStrategy(QFont.PreferAntialias)
+    default_font.setHintingPreference(QFont.PreferNoHinting)   # or PreferFullHinting
+    application.setFont(default_font)
 
     from .hinstall_window import InstallerWindow
     installer_window = InstallerWindow(args=args)

@@ -67,7 +67,7 @@ class Ui_FFmpegSelectionWidget(object):
     def setupUi(self, FFmpegSelectionWidget, theme: Type[Theme]):
         if not FFmpegSelectionWidget.objectName():
             FFmpegSelectionWidget.setObjectName(u"FFmpegSelectionWidget")
-        FFmpegSelectionWidget.resize(640, 561)
+        FFmpegSelectionWidget.resize(500, 536)
         self.main_layout = QVBoxLayout(FFmpegSelectionWidget)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -89,8 +89,12 @@ class Ui_FFmpegSelectionWidget(object):
 
         self.main_layout.addWidget(self.subtitle)
 
+        self.verticalSpacer_2 = QSpacerItem(20, 8, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+
+        self.main_layout.addItem(self.verticalSpacer_2)
+
         self.selection_layout = QVBoxLayout()
-        self.selection_layout.setSpacing(16)
+        self.selection_layout.setSpacing(20)
         self.selection_layout.setObjectName(u"selection_layout")
         self.minimal_layout = QVBoxLayout()
         self.minimal_layout.setSpacing(3)

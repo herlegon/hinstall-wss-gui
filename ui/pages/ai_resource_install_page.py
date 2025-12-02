@@ -29,7 +29,6 @@ class AiResourceInstallPage(BasePage, Ui_AiResourceInstallWidget):
         super().__init__(parent=parent, theme=theme)
         self.setupUi(self, theme=theme)
         self._step_label = "AI Computational Resource"
-        self.set_has_progress_bar(True)  # This page has a progress bar
 
 
     def start_installation(self):
@@ -39,21 +38,21 @@ class AiResourceInstallPage(BasePage, Ui_AiResourceInstallWidget):
             "Installing computational resources...",
             "Setting up environment..."
         ]
-        
+
         # Create and start worker
         self.worker = InstallWorker(steps)
         self.worker.progress.connect(self._update_progress)
         self.worker.status.connect(self.label.setText)
         self.worker.finished_signal.connect(self._on_finished)
-        
+
         # Reset progress bar
         self.progress_bar.setValue(0)
         self.label_2.setText("0%")
-        
+
         # Start worker
         self.worker.start()
-    
-    
+
+
     def _update_progress(self, value: int):
         """Update progress bar and percentage label."""
         self.progress_bar.setValue(value)
@@ -70,8 +69,8 @@ class AiResourceInstallPage(BasePage, Ui_AiResourceInstallWidget):
         else:
             self.label.setText("✗ Installation failed")
             self.completed.emit(False)
-    
-    
+
+
     def get_result(self) -> dict:
         return {'installed_files': self.installed_files}
 

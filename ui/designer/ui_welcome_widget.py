@@ -67,7 +67,7 @@ class Ui_WelcomeWidget(object):
     def setupUi(self, WelcomeWidget, theme: Type[Theme]):
         if not WelcomeWidget.objectName():
             WelcomeWidget.setObjectName(u"WelcomeWidget")
-        WelcomeWidget.resize(695, 373)
+        WelcomeWidget.resize(562, 316)
         self.main_layout = QVBoxLayout(WelcomeWidget)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -94,7 +94,7 @@ class Ui_WelcomeWidget(object):
         self.main_layout.addItem(self.verticalSpacer)
 
         self.verticalLayout = QVBoxLayout()
-        self.verticalLayout.setSpacing(16)
+        self.verticalLayout.setSpacing(20)
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.verticalLayout_3 = QVBoxLayout()
         self.verticalLayout_3.setSpacing(3)

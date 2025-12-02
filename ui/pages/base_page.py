@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 from hwidgets import (
     Theme,
+    HProgressBarType
 )
 
 
@@ -32,7 +33,7 @@ class BasePage(QWidget, ABC, metaclass=QWidgetABCMeta):
         self.theme = theme
 
         self.main_layout: QLayout
-        
+
         # Worker and installation tracking
         self.worker: Optional[Any] = None
         self.installed_files: List[str] = []
@@ -49,8 +50,8 @@ class BasePage(QWidget, ABC, metaclass=QWidgetABCMeta):
             # Use QTimer to ensure UI is fully rendered
             from PySide6.QtCore import QTimer
             QTimer.singleShot(100, self._start_installation_if_exists)
-    
-    
+
+
     def _start_installation_if_exists(self):
         """Call start_installation if it exists."""
         if hasattr(self, 'start_installation') and callable(self.start_installation):
@@ -64,22 +65,21 @@ class BasePage(QWidget, ABC, metaclass=QWidgetABCMeta):
     def setMainLayoutSpacing(self, spacing: int) -> None:
         self.main_layout.setSpacing(spacing)
 
-    
+
     def has_progress_bar(self) -> bool:
-        """Check if this page has a progress bar widget."""
-        return self._has_progress_bar
-    
-    
-    def set_has_progress_bar(self, has_progress_bar: bool) -> None:
-        """Set whether this page has a progress bar."""
-        self._has_progress_bar = has_progress_bar
-    
-    
+        """Check if the QWidget contains any specific progress bars of type HProgressBarType."""
+        # Iterate through all children widgets of the given QWidget
+        for child in self.findChildren(QWidget):
+            if isinstance(child, HProgressBarType):  # Check if child is one of the HProgressBarType
+                return True
+        return False
+
+
     def get_installed_files(self) -> List[str]:
         """Return list of files created/modified during installation."""
         return self.installed_files
-    
-    
+
+
     def cancel_worker(self) -> None:
         """Cancel the running worker if it exists."""
         if self.worker and hasattr(self.worker, 'cancel'):

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from hwidgets import (
     Theme,
 )
+from hytils import red
 from ..designer.ui_third_party_install_widget import Ui_ThirdPartiesInstall
 from .base_page import BasePage
 from ..install_workers import InstallWorker
@@ -29,7 +30,7 @@ class ThirdPartiesInstallPage(BasePage, Ui_ThirdPartiesInstall):
         super().__init__(parent=parent, theme=theme)
         self.setupUi(self, theme=theme)
         self._step_label = "Third parties"
-        self.set_has_progress_bar(True)  # This page has a progress bar
+        self.progress_bar.setValue(0)
 
         self._packages = []
 
@@ -43,27 +44,28 @@ class ThirdPartiesInstallPage(BasePage, Ui_ThirdPartiesInstall):
 
 
     def start_installation(self):
+        print(red("start install"))
         """Start the installation worker."""
         steps = [
             "Downloading third-party software...",
             "Installing components...",
             "Finalizing installation..."
         ]
-        
+
         # Create and start worker
         self.worker = InstallWorker(steps)
         self.worker.progress.connect(self._update_progress)
         self.worker.status.connect(self.label.setText)
         self.worker.finished_signal.connect(self._on_finished)
-        
+
         # Reset progress bar
         self.progress_bar.setValue(0)
         self.label_2.setText("0%")
-        
+
         # Start worker
         self.worker.start()
-    
-    
+
+
     def _update_progress(self, value: int):
         """Update progress bar and percentage label."""
         self.progress_bar.setValue(value)
@@ -80,8 +82,8 @@ class ThirdPartiesInstallPage(BasePage, Ui_ThirdPartiesInstall):
         else:
             self.label.setText("✗ Installation failed")
             self.completed.emit(False)
-    
-    
+
+
     def get_result(self) -> dict:
         return {'installed_files': self.installed_files}
 

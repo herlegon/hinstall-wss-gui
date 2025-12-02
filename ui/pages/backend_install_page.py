@@ -31,7 +31,6 @@ class BackendInstallPage(BasePage, Ui_BackendWidget):
         self.setupUi(self, theme=theme)
 
         self._step_label = f"Processing Server"
-        self.set_has_progress_bar(True)  # This page has a progress bar
 
         self.subtitle.setWordWrap(True)
         size_policy = self.subtitle.sizePolicy()
@@ -51,21 +50,21 @@ class BackendInstallPage(BasePage, Ui_BackendWidget):
             "Installing dependencies...",
             "Configuring server..."
         ]
-        
+
         # Create and start worker
         self.worker = InstallWorker(steps)
         self.worker.progress.connect(self._update_progress)
         self.worker.status.connect(self.label.setText)
         self.worker.finished_signal.connect(self._on_finished)
-        
+
         # Reset progress bar
         self.progress_bar.setValue(0)
         self.label_2.setText("0%")
-        
+
         # Start worker
         self.worker.start()
-    
-    
+
+
     def _update_progress(self, value: int):
         """Update progress bar and percentage label."""
         self.progress_bar.setValue(value)
@@ -82,8 +81,8 @@ class BackendInstallPage(BasePage, Ui_BackendWidget):
         else:
             self.label.setText("✗ Installation failed")
             self.completed.emit(False)
-    
-    
+
+
     def get_result(self) -> dict:
         return {'installed_files': self.installed_files}
 
