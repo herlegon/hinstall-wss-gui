@@ -90,19 +90,19 @@ class Ui_ThirdPartiesInstall(object):
 
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.label = HLabel(ThirdPartiesInstall, theme=theme)
-        self.label.setObjectName(u"label")
+        self.indicator_step = HLabel(ThirdPartiesInstall, theme=theme)
+        self.indicator_step.setObjectName(u"indicator_step")
 
-        self.horizontalLayout.addWidget(self.label)
+        self.horizontalLayout.addWidget(self.indicator_step)
 
         self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout.addItem(self.horizontalSpacer)
 
-        self.label_2 = HLabel(ThirdPartiesInstall, theme=theme)
-        self.label_2.setObjectName(u"label_2")
+        self.indicator_progress = HLabel(ThirdPartiesInstall, theme=theme)
+        self.indicator_progress.setObjectName(u"indicator_progress")
 
-        self.horizontalLayout.addWidget(self.label_2)
+        self.horizontalLayout.addWidget(self.indicator_progress)
 
 
         self.verticalLayout_2.addLayout(self.horizontalLayout)
@@ -130,7 +130,7 @@ class Ui_ThirdPartiesInstall(object):
         ThirdPartiesInstall.setWindowTitle(QCoreApplication.translate("ThirdPartiesInstall", u"Form", None))
         self.title.setText(QCoreApplication.translate("ThirdPartiesInstall", u"Third-party software", None))
         self.subtitle.setText(QCoreApplication.translate("ThirdPartiesInstall", u"Download and installation of third parties software", None))
-        self.label.setText(QCoreApplication.translate("ThirdPartiesInstall", u"Downloading FFmpeg", None))
-        self.label_2.setText(QCoreApplication.translate("ThirdPartiesInstall", u"100%", None))
+        self.indicator_step.setText(QCoreApplication.translate("ThirdPartiesInstall", u"Downloading FFmpeg", None))
+        self.indicator_progress.setText(QCoreApplication.translate("ThirdPartiesInstall", u"100%", None))
     # retranslateUi
 

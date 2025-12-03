@@ -1,4 +1,6 @@
-from typing import Type
+from pprint import pprint
+import sys
+from typing import Any, Type
 from PySide6.QtCore import (
     Signal,
 )
@@ -10,16 +12,21 @@ from PySide6.QtWidgets import (
     QWidget,
     QSizePolicy
 )
+from hinstall import (
+    ExtPackages,
+    download_install_ext_packages,
+)
 from hwidgets import (
     Theme,
 )
-from hytils import red
+from hytils import lightgreen, red, yellow
 from ..designer.ui_third_party_install_widget import Ui_ThirdPartiesInstall
-from .base_page import BasePage
+from .page import Page
+from .ffmpeg_selection_page import FfmpegSelection
 from ..install_workers import InstallWorker
 
 
-class ThirdPartiesInstallPage(BasePage, Ui_ThirdPartiesInstall):
+class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
     # signal_settings_modified = Signal()
 
     def __init__(
@@ -32,58 +39,112 @@ class ThirdPartiesInstallPage(BasePage, Ui_ThirdPartiesInstall):
         self._step_label = "Third parties"
         self.progress_bar.setValue(0)
 
-        self._packages = []
+        # Settings used to filter some packages to install
+        self.settings = {}
+
+        # Packages to install
+        self.packages: ExtPackages = None
+
+        self.reset_widgets()
 
 
-    def get_user_settings(self) -> dict:
-        return {}
+    def reset_widgets(self) -> None:
+        super().reset_widgets()
+
+        # Use by default
+        self.indicator_step.setText("Initializing")
+        self.indicator_progress.setText("")
 
 
-    def set_packages(self, packages: list[str]) -> None:
-        self._packages = packages
+    def update_settings(self, settings: dict[str, Any]) -> None:
+        print(yellow(f"{self.objectName()}"))
+        pprint(settings)
+        self.settings: dict = settings
+        self.packages = None
+
+
+        self.packages = self.settings.get('packages', None)
+        if self.packages is None:
+            return
+
+        ffmpeg_selection = self.settings.get('ffmpeg_selection', "")
+        if ffmpeg_selection:
+            self.packages = self.packages.get_all_except('ffmpeg')
 
 
     def start_installation(self):
         print(red("start install"))
-        """Start the installation worker."""
-        steps = [
-            "Downloading third-party software...",
-            "Installing components...",
-            "Finalizing installation..."
-        ]
+        print(self.packages)
 
-        # Create and start worker
-        self.worker = InstallWorker(steps)
-        self.worker.progress.connect(self._update_progress)
-        self.worker.status.connect(self.label.setText)
-        self.worker.finished_signal.connect(self._on_finished)
+        # No packages to install
+        if self.packages is None or not self.packages:
+            self._on_finished(success=True, files=[])
+            return
 
-        # Reset progress bar
-        self.progress_bar.setValue(0)
-        self.label_2.setText("0%")
+
+        print(self.packages)
+
+        installed: bool = download_install_ext_packages(
+            packages=self.packages,
+            reinstall=True,
+            threads=1,
+            use_local_host=True
+        )
+        if installed:
+            print(lightgreen("All packages installed"))
+
+        else:
+            self.progress_bar.setValue(0)
+            self.indicator_step.setText("Failed.")
+            self.indicator_progress
+            print(red("Error: missing package(s)"))
+
+        # """Start the installation worker."""
+        # steps = [
+        #     "Downloading third-party software...",
+        #     "Installing components...",
+        #     "Finalizing installation..."
+        # ]
+
+        # # Create and start worker
+        # self.worker = InstallWorker(steps)
+        # self.worker.progress.connect(self._update_progress)
+        # self.worker.status.connect(self.label.setText)
+        # self.worker.finished_signal.connect(self._on_finished)
+
+        # # Reset progress bar
+        # self.progress_bar.setValue(0)
+        # self.label_2.setText("0%")
 
         # Start worker
-        self.worker.start()
+        # self.worker.start()
 
 
     def _update_progress(self, value: int):
         """Update progress bar and percentage label."""
         self.progress_bar.setValue(value)
-        self.label_2.setText(f"{value}%")
+        self.indicator_progress.setText(f"{value}%")
 
 
     def _on_finished(self, success: bool, files: list):
         """Handle completion of installation."""
+        self._installation_started = False
+        self.progress_bar.setValue(100)
+
         if success:
+            self.indicator_step.setText("Installation complete.")
+            self.indicator_progress.setText("100%")
             self.installed_files = files
-            self.label.setText("✓ Installation complete!")
-            self.label_2.setText("100%")
             self.completed.emit(True)
         else:
-            self.label.setText("✗ Installation failed")
+            self.indicator_step.setText("Installation failed.")
+            self.indicator_progress.setText("✗")
             self.completed.emit(False)
 
 
     def get_result(self) -> dict:
-        return {'installed_files': self.installed_files}
+        return {
+            'installed_files': self.installed_files
+        }
+
 

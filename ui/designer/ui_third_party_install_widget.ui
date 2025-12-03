@@ -67,7 +67,7 @@
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
-        <widget class="QLabel" name="label">
+        <widget class="QLabel" name="indicator_step">
          <property name="text">
           <string>Downloading FFmpeg</string>
          </property>
@@ -87,7 +87,7 @@
         </spacer>
        </item>
        <item>
-        <widget class="QLabel" name="label_2">
+        <widget class="QLabel" name="indicator_progress">
          <property name="text">
           <string>100%</string>
          </property>

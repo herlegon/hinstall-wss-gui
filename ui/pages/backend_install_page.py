@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Any, Type
 from PySide6.QtCore import (
     Signal,
 )
@@ -13,13 +13,14 @@ from PySide6.QtWidgets import (
 from hwidgets import (
     Theme,
 )
+from hytils import red
 from ..designer.ui_backend_install_widget import Ui_BackendWidget
-from .base_page import BasePage
+from .page import Page
 from ..install_workers import InstallWorker
 
 
 
-class BackendInstallPage(BasePage, Ui_BackendWidget):
+class BackendInstallPage(Page, Ui_BackendWidget):
     # signal_settings_modified = Signal()
 
     def __init__(
@@ -41,6 +42,13 @@ class BackendInstallPage(BasePage, Ui_BackendWidget):
         self.subtitle.setMaximumHeight(1024)
         self.subtitle.adjustSize()
         self.adjustSize()
+
+        self.reset_widgets()
+
+
+    def update_settings(self, settings: dict[str, Any]) -> None:
+        print(red("todo"))
+
 
 
     def start_installation(self):
@@ -73,6 +81,7 @@ class BackendInstallPage(BasePage, Ui_BackendWidget):
 
     def _on_finished(self, success: bool, files: list):
         """Handle completion of installation."""
+        self._installation_started = False
         if success:
             self.installed_files = files
             self.label.setText("✓ Backend installed!")

@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Any, Literal, Type
 from PySide6.QtCore import (
     Signal,
 )
@@ -14,11 +14,15 @@ from PySide6.QtWidgets import (
 from hwidgets import (
     Theme,
 )
+from hytils import red
 from ..designer.ui_ffmpeg_selection_widget import Ui_FFmpegSelectionWidget
-from .base_page import BasePage
+from .page import Page
 
 
-class FFmpegSelectionPage(BasePage, Ui_FFmpegSelectionWidget):
+FfmpegSelection = Literal['lgpl', 'gpl', 'user']
+
+
+class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
     # signal_settings_modified = Signal()
 
     def __init__(
@@ -56,6 +60,46 @@ class FFmpegSelectionPage(BasePage, Ui_FFmpegSelectionWidget):
         # self.updateGeometry()
 
         self.invalidate_all_layouts()
+        self.reset_widgets()
+
+
+    def reset_widgets(self) -> None:
+        super().reset_widgets()
+
+        # Use by default
+        self.radio_button_minimal.setChecked(True)
+
+
+
+    def update_settings(self, settings: dict[str, Any]) -> None:
+        self.set_default_settings(settings=settings)
+
+
+
+    def get_selection(self) -> FfmpegSelection:
+        if self.radio_button_user.isChecked():
+            return 'user'
+        if self.radio_button_third_party.isChecked():
+            return 'gpl'
+        return 'lgpl'
+
+
+    def get_user_settings(self) -> dict:
+        return {
+            'ffmpeg_selection': self.get_selection(),
+        }
+
+
+    def set_default_settings(self, settings: dict[str, Any]) -> None:
+        ffmpeg_selection: FfmpegSelection = settings.get('ffmpeg_selection', 'lgpl')
+        if ffmpeg_selection == 'gpl':
+            self.radio_button_third_party.setChecked(True)
+        elif ffmpeg_selection == 'user':
+            self.radio_button_user.setChecked(True)
+        else:
+            # minimal (lgpl)
+            self.radio_button_minimal.setChecked(True)
+
 
 
     def invalidate_all_layouts(self):
@@ -75,20 +119,6 @@ class FFmpegSelectionPage(BasePage, Ui_FFmpegSelectionWidget):
         self.adjustSize()
 
 
-    def get_selection(self) -> str:
-        if self.radio_button_user.isChecked():
-            return 'user'
-
-        if self.radio_button_third_party.isChecked():
-            return 'third-party'
-
-        return 'minimal'
-
-
-    def get_user_settings(self) -> dict:
-        return {
-            'selection': self.get_selection(),
-        }
 
 
     def get_result(self) -> dict:

@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Any, Type
 from PySide6.QtCore import (
     Signal,
 )
@@ -13,12 +13,13 @@ from PySide6.QtWidgets import (
 from hwidgets import (
     Theme,
 )
+from hytils import red
 from ..designer.ui_ai_resource_install_widget import Ui_AiResourceInstallWidget
-from .base_page import BasePage
+from .page import Page
 from ..install_workers import InstallWorker
 
 
-class AiResourceInstallPage(BasePage, Ui_AiResourceInstallWidget):
+class AiResourceInstallPage(Page, Ui_AiResourceInstallWidget):
     # signal_settings_modified = Signal()
 
     def __init__(
@@ -29,6 +30,12 @@ class AiResourceInstallPage(BasePage, Ui_AiResourceInstallWidget):
         super().__init__(parent=parent, theme=theme)
         self.setupUi(self, theme=theme)
         self._step_label = "AI Computational Resource"
+
+        self.reset_widgets()
+
+
+    def update_settings(self, settings: dict[str, Any]) -> None:
+        print(red("todo"))
 
 
     def start_installation(self):
@@ -61,6 +68,7 @@ class AiResourceInstallPage(BasePage, Ui_AiResourceInstallWidget):
 
     def _on_finished(self, success: bool, files: list):
         """Handle completion of installation."""
+        self._installation_started = False
         if success:
             self.installed_files = files
             self.label.setText("✓ AI resources installed!")

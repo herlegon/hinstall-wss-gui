@@ -40,7 +40,7 @@ from .install_workers import CleanupWorker
 
 from .title_bar import TitleBar
 
-from .pages.base_page import BasePage
+from .pages.page import Page
 from .pages.welcome_page import WelcomePage
 from .pages.ffmpeg_selection_page import FFmpegSelectionPage
 from .pages.third_parties_install_page import ThirdPartiesInstallPage
@@ -68,16 +68,20 @@ class InstallerWindow(QMainWindow):
         with open(config_fp, "rb") as f:
             data: dict[str, Any] = tomllib.load(f)
         packages_cfg = parse_config_(data)
-        external_packages = ExtPackages(packages_cfg, sys.platform)
+        xtal_pkgs = ExtPackages(packages_cfg, sys.platform)
 
-        self.pages: list[Type[BasePage]] = [
+        self.pages: list[Type[Page]] = [
             WelcomePage(self, theme=theme),
             ThirdPartiesInstallPage(self, theme=theme),
             BackendInstallPage(self, theme=theme),
             AiResourceInstallPage(self, theme=theme),
         ]
-        if external_packages.get_by_key('ffmpeg') is not None:
+        if xtal_pkgs.get_by_key('ffmpeg') is not None:
             self.pages.insert(1, FFmpegSelectionPage(self, theme=theme))
+
+        self.settings: dict[str, Any] = {
+            'packages': xtal_pkgs,
+        }
 
 
         self.setWindowTitle("First time installer")
@@ -87,7 +91,7 @@ class InstallerWindow(QMainWindow):
         for p in self.pages:
             p.setMainLayoutSpacing(12)
             p.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-            p.show()
+            # Don't call show() here - it will be called by QStackedWidget when page becomes current
             p.updateGeometry()
 
         # Frameless
@@ -269,6 +273,13 @@ class InstallerWindow(QMainWindow):
         # QTimer.singleShot(500, self.page1.start_installation)
 
         self.center_on_screen()
+        self.setFixedSize(self.sizeHint())
+
+        # Ensure the first page's showEvent is triggered after window is fully set up
+        # Use a timer to ensure all initialization is complete
+        page: Type[Page] = self.stack.currentWidget()
+        page.update_settings(self.settings)
+        QTimer.singleShot(50, lambda: self.stack.currentWidget().show())
 
 
     def center_on_screen(self):
@@ -295,7 +306,7 @@ class InstallerWindow(QMainWindow):
         self.stack.updateGeometry()
 
 
-    def slot_task_completed(self, p: Type[BasePage], result: bool) -> None:
+    def slot_task_completed(self, p: Type[Page], result: bool) -> None:
         """Handle task completion from a page."""
         if not result:
             print("Error during installation")
@@ -313,16 +324,29 @@ class InstallerWindow(QMainWindow):
 
     def slot_go_next(self):
         """Handle next button click."""
+        print("next")
         current = self.stack.currentIndex()
+
+        #  Update settings
+        page: Type[Page] = self.stack.currentWidget()
+        results = page.get_result()
+        self.settings.update(results)
+
+        # End of installation
         if current >= self.stack.count() - 1:
+            # TODO: last tasks
             self.close()
             return
 
-        if current < self.stack.count() - 1:
-            current += 1
-            self.stack.setCurrentIndex(current)
-            self.cancel_button.setEnabled(True)
-            self.cancel_button.setVisible(True)
+        # Update settings before showing it
+        current += 1
+        next_page: Type[Page] = self.stack.widget(current)
+        next_page.update_settings(self.settings)
+
+
+        self.stack.setCurrentIndex(current)
+        self.cancel_button.setEnabled(True)
+        self.cancel_button.setVisible(True)
 
         # Check if new page has progress bar
         current_page = self.pages[current]
@@ -460,6 +484,7 @@ class InstallerWindow(QMainWindow):
 
 
     def _on_complete(self):
+        print("completed")
         self.next_button.setEnabled(True)
         self.next_button.clicked.disconnect()
         self.next_button.clicked.connect(self.close)

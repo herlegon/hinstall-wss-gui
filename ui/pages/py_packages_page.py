@@ -11,9 +11,9 @@ from PySide6.QtGui import QFont, QColor, QIcon, QPainter, QPainterPath, QRegion
 
 from install_workers import InstallWorker
 from components.styled_progress_bar import StyledProgressBar
-from .base_page import BasePage
+from .page import Page
 
-class PyPackagesPage(BasePage):
+class PyPackagesPage(Page):
     install_complete = Signal()
     log_message = Signal(str)
 
