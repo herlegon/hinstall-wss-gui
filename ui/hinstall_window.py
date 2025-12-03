@@ -7,8 +7,10 @@ import tomllib
 from typing import Any, Type
 
 from PySide6.QtCore import (
-    Qt, QTimer,
+    Qt, QTimer, QObject, Signal,
 )
+import logging
+from hinstall.logger import setup_alog
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -46,6 +48,20 @@ from .pages.ffmpeg_selection_page import FFmpegSelectionPage
 from .pages.third_parties_install_page import ThirdPartiesInstallPage
 from .pages.backend_install_page import BackendInstallPage
 from .pages.ai_resource_install_page import AiResourceInstallPage
+
+
+class Signaller(QObject):
+    new_record = Signal(str)
+
+
+class QtLogHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.signaller = Signaller()
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.signaller.new_record.emit(msg)
 
 
 class InstallerWindow(QMainWindow):
@@ -167,7 +183,8 @@ class InstallerWindow(QMainWindow):
         if self.stack.layout():
             self.stack.layout().setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
 
-        self.stack.setStyleSheet(f"background-color: {theme.window_bgd};")
+        # self.stack.setStyleSheet(f"background-color: {theme.window_bgd};")
+        self.stack.setStyleSheet(f"background-color: #303030;")
         for p in self.pages:
             self.stack.addWidget(p)
 
@@ -200,7 +217,7 @@ class InstallerWindow(QMainWindow):
         """)
 
         navigation_layout = QHBoxLayout(navigation_widget)
-        navigation_layout.setContentsMargins(content_hpadding,8,24,8)
+        navigation_layout.setContentsMargins(content_hpadding,8, 24 ,8)
         navigation_layout.setSpacing(16)
 
         self.info = HComment(parent=self, theme=theme, text = "Requires at least 8GB. (Available: 30GB)")
@@ -217,20 +234,29 @@ class InstallerWindow(QMainWindow):
         self.log_container.setStyleSheet(f"background-color: {theme.window_bgd}")
         self.log_layout = QVBoxLayout(self.log_container)
         self.log_layout.setContentsMargins(
-            content_hpadding, 8, 0, 4
+            content_hpadding, 8, 24, 4
         )
-        self.log_layout.setSpacing(4)
+        self.log_spacing = 4
+        self.log_layout.setSpacing(self.log_spacing)
 
         # Log Toggle Button
         self.log_button = HFramelessButton(parent=self, text="Show Log", theme=theme)
         self.log_button.setCheckable(True)
+        self.log_button.setChecked(False)
         self.log_button.setFixedWidth(self.log_button.sizeHint().width())
 
         self.log_viewer = HLogViewer(parent=self, theme=theme)
         self.log_viewer.setVisible(False)
+        self.log_viewer_height = 150  # Fixed height for log viewer
+        self.log_viewer.setFixedHeight(self.log_viewer_height)
         self.log_layout.addWidget(self.log_button)
         self.log_layout.addWidget(self.log_viewer)
+        self.log_button.clicked.connect(self.slot_toggle_log)
 
+        # Setup logging
+        self.log_handler = QtLogHandler()
+        self.log_handler.signaller.new_record.connect(self.slot_append_log)
+        setup_alog(to_stdout=True, to_gui=self.log_handler)
 
         # Window layout
         main_layout.addWidget(self.title_bar)
@@ -272,14 +298,16 @@ class InstallerWindow(QMainWindow):
         # # Start
         # QTimer.singleShot(500, self.page1.start_installation)
 
-        self.center_on_screen()
-        self.setFixedSize(self.sizeHint())
 
         # Ensure the first page's showEvent is triggered after window is fully set up
         # Use a timer to ensure all initialization is complete
         page: Type[Page] = self.stack.currentWidget()
         page.update_settings(self.settings)
-        QTimer.singleShot(50, lambda: self.stack.currentWidget().show())
+        self.stack.currentWidget().show()
+
+        self.center_on_screen()
+        self.setFixedSize(self.sizeHint())
+
 
 
     def center_on_screen(self):
@@ -287,6 +315,64 @@ class InstallerWindow(QMainWindow):
         x = (screen.width() - self.width()) // 2
         y = (screen.height() - self.height()) // 2
         self.move(x, y)
+
+
+    def slot_toggle_log(self, b: bool):
+        window_height = self.height()
+        # Use fixed log viewer height plus spacing
+        log_height = self.log_viewer_height + 2 * self.log_spacing
+        was_visible: bool = self.log_viewer.isVisible()
+
+        self.blockSignals(True)
+        if not was_visible and b:
+            # Show log viewer and expand window height
+            self.log_viewer.show()
+            new_height = window_height + log_height
+            self.setFixedSize(self.width(), new_height)
+
+        elif was_visible and not b:
+            # Hide log viewer and shrink window height
+            new_height = window_height - log_height
+            self.log_viewer.hide()
+            self.setFixedSize(self.width(), new_height)
+
+        self.blockSignals(False)
+
+        # Update button text
+        if b:
+            self.log_button.setText("Hide Log")
+        else:
+            self.log_button.setText("Show Log")
+
+
+    def adjust_size_after_log_hide(self):
+        self.layout().update()
+        self.adjustSize()
+        self.setMaximumWidth(65535)
+
+
+    def slot_append_log(self, message):
+        self.log_viewer.appendPlainText(message)
+        # Auto-scroll
+        sb = self.log_viewer.verticalScrollBar()
+        sb.setValue(sb.maximum())
+
+
+    def _resize_to_current_page(self):
+        """Resize the window to fit the current page's content."""
+        # Get current page and ensure its geometry is updated
+        current_page = self.stack.currentWidget()
+        if current_page:
+            current_page.updateGeometry()
+
+        # Update stack geometry
+        self.stack.updateGeometry()
+
+        # Temporarily unset fixed size to allow resizing
+        self.setFixedSize(self.sizeHint())
+
+        # Re-center the window
+        self.center_on_screen()
 
 
 
@@ -374,7 +460,7 @@ class InstallerWindow(QMainWindow):
             self.info.setVisible(False)
 
         # Resize window to fit the new page
-        # self.adjustSize()
+        QTimer.singleShot(0, self._resize_to_current_page)
 
 
     def slot_go_previous(self):
@@ -395,7 +481,7 @@ class InstallerWindow(QMainWindow):
                 self.next_button.setEnabled(True)
 
             # Resize window to fit the new page
-            # self.adjustSize()
+            QTimer.singleShot(0, self._resize_to_current_page)
 
 
     def slot_cancel(self):
@@ -489,18 +575,4 @@ class InstallerWindow(QMainWindow):
         self.next_button.clicked.disconnect()
         self.next_button.clicked.connect(self.close)
 
-    # def _toggle_log(self, checked):
-    #     self.log_viewer.setVisible(checked)
-    #     if checked:
-    #         self.log_button.setText("Hide Log")
-    #         self.setFixedSize(750, 760) # Expand window (more height for button + log + padding)
-    #     else:
-    #         self.log_button.setText("Show Log")
-    #         self.setFixedSize(750, 580) # Restore size
-
-    def _append_log(self, message):
-        self.log_viewer.append(message)
-        # Auto-scroll
-        sb = self.log_viewer.verticalScrollBar()
-        sb.setValue(sb.maximum())
 

@@ -58,10 +58,10 @@ def setup_alog(
     #     file_handler.setFormatter(file_formatter or SimpleFormatter())
     #     logger.addHandler(file_handler)
 
-    # # GUI handler
-    # if to_gui:
-    #     to_gui.setFormatter(gui_formatter or SimpleFormatter())
-    #     logger.addHandler(to_gui)
+    # GUI handler
+    if to_gui:
+        to_gui.setFormatter(gui_formatter or logging.Formatter('%(message)s'))
+        logger.addHandler(to_gui)
 
     return logger
 

@@ -67,7 +67,7 @@ class Ui_FFmpegSelectionWidget(object):
     def setupUi(self, FFmpegSelectionWidget, theme: Type[Theme]):
         if not FFmpegSelectionWidget.objectName():
             FFmpegSelectionWidget.setObjectName(u"FFmpegSelectionWidget")
-        FFmpegSelectionWidget.resize(500, 536)
+        FFmpegSelectionWidget.resize(640, 585)
         self.main_layout = QVBoxLayout(FFmpegSelectionWidget)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -181,7 +181,7 @@ class Ui_FFmpegSelectionWidget(object):
 
         self.selection_layout.addLayout(self.installed_ffmpeg)
 
-        self.verticalSpacer = QSpacerItem(20, 16, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self.verticalSpacer = QSpacerItem(20, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         self.selection_layout.addItem(self.verticalSpacer)
 
@@ -189,7 +189,7 @@ class Ui_FFmpegSelectionWidget(object):
         self.disclaimer.setObjectName(u"disclaimer")
         self.disclaimer.setWordWrap(True)
 
-        self.selection_layout.addWidget(self.disclaimer)
+        self.selection_layout.addWidget(self.disclaimer, 0, Qt.AlignmentFlag.AlignTop)
 
 
         self.main_layout.addLayout(self.selection_layout)
@@ -219,6 +219,6 @@ class Ui_FFmpegSelectionWidget(object):
 "You are responsible for license and patent compliance, including commercial use.", None))
         self.line_edit_ffmpeg_dir.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"No file selected", None))
         self.outlined_button_browse.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"...", None))
-        self.disclaimer.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Disclaimer: neither Herlogon nor their developers is responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.", None))
+        self.disclaimer.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Disclaimer: neither Herlegon nor their developers is responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.", None))
     # retranslateUi
 

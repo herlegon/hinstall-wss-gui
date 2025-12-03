@@ -5,6 +5,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QPaintEvent,
     QFont,
+    QPainter,
 )
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -17,6 +18,8 @@ from hwidgets import (
 from hytils import red
 from ..designer.ui_ffmpeg_selection_widget import Ui_FFmpegSelectionWidget
 from .page import Page
+
+from hwidgets.debug import *
 
 
 FfmpegSelection = Literal['lgpl', 'gpl', 'user']
@@ -34,12 +37,25 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
         self.setupUi(self, theme=theme)
         self._step_label = f"FFmpeg Notice & Selection"
 
-        # Set page size policy to contract to minimum height
+        # Set page size policy to fit content
         self.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
+        self.setMinimumHeight(0)
 
-        # Set disclaimer to use minimum height
+        # Set disclaimer to properly calculate height for word-wrapped text
+        self.disclaimer.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
+        # Remove minimum height constraint to allow proper expansion
+        self.disclaimer.setMinimumHeight(0)
+        self.disclaimer.setMaximumHeight(16777215)  # Remove any max height constraint
+        
+        # Set maximum width to match content area (window width - padding)
+        # This is necessary for QLabel to properly calculate height for word-wrapped text
+        content_width = 900 - (64 * 2)  # window width - horizontal padding
+        self.disclaimer.setMaximumWidth(content_width)
+        
         font = QFont(
             self.disclaimer.font().family(),
             pointSize=8,
@@ -47,20 +63,45 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
             italic=True,
         )
         self.disclaimer.setFont(font)
-        self.disclaimer.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
-        )
-
-        # Force layout updates
-        # self.adjustSize()
-        # self.updateGeometry()
-
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-        # self.show()
-        # self.updateGeometry()
-
-        self.invalidate_all_layouts()
+        
+        # Modify the vertical spacer to not take space from disclaimer
+        # Find the spacer item in the layout
+        for i in range(self.selection_layout.count()):
+            item = self.selection_layout.itemAt(i)
+            if item and item.spacerItem():
+                # Change spacer from Expanding to Fixed with small size
+                spacer = item.spacerItem()
+                spacer.changeSize(20, 8, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+                break
+        
+        # Force the disclaimer to recalculate its size based on content
+        self.disclaimer.adjustSize()
+        self.disclaimer.updateGeometry()
+        
+        # Explicitly set minimum height based on size hint to ensure full text is visible
+        hint_height = self.disclaimer.sizeHint().height()
+        self.disclaimer.setMinimumHeight(hint_height)
+        
+        # Invalidate layouts to force recalculation
+        self.selection_layout.invalidate()
+        self.selection_layout.activate()
+        self.main_layout.invalidate()
+        self.main_layout.activate()
+        
+        # Update the page geometry
+        self.updateGeometry()
+        
         self.reset_widgets()
+
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        # if DEBUG_GEOMETRY:
+        draw_widget_rect(self, painter, color="red")
+        painter.end()
+
+
 
 
     def reset_widgets(self) -> None:
