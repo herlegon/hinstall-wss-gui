@@ -11,6 +11,14 @@ from PySide6.QtCore import (
 )
 import logging
 from hinstall.logger import setup_alog
+from PySide6.QtCore import (
+    QEvent,
+)
+from PySide6.QtGui import (
+    QCursor,
+    QHoverEvent,
+    QMouseEvent,
+)
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -101,7 +109,7 @@ class InstallerWindow(QMainWindow):
 
 
         self.setWindowTitle("First time installer")
-        self.setFixedWidth(900)
+        self.setFixedWidth(1100)
         content_hpadding: int= 64
         content_vpadding: int = 16
         for p in self.pages:
@@ -183,8 +191,7 @@ class InstallerWindow(QMainWindow):
         if self.stack.layout():
             self.stack.layout().setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
 
-        # self.stack.setStyleSheet(f"background-color: {theme.window_bgd};")
-        self.stack.setStyleSheet(f"background-color: #303030;")
+        self.stack.setStyleSheet(f"background-color: {theme.window_bgd};")
         for p in self.pages:
             self.stack.addWidget(p)
 
@@ -217,7 +224,7 @@ class InstallerWindow(QMainWindow):
         """)
 
         navigation_layout = QHBoxLayout(navigation_widget)
-        navigation_layout.setContentsMargins(content_hpadding,8, 24 ,8)
+        navigation_layout.setContentsMargins(content_hpadding, 4, 24 , 4)
         navigation_layout.setSpacing(16)
 
         self.info = HComment(parent=self, theme=theme, text = "Requires at least 8GB. (Available: 30GB)")
@@ -234,7 +241,7 @@ class InstallerWindow(QMainWindow):
         self.log_container.setStyleSheet(f"background-color: {theme.window_bgd}")
         self.log_layout = QVBoxLayout(self.log_container)
         self.log_layout.setContentsMargins(
-            content_hpadding, 8, 24, 4
+            content_hpadding, 8, 24, 8
         )
         self.log_spacing = 4
         self.log_layout.setSpacing(self.log_spacing)
@@ -305,8 +312,23 @@ class InstallerWindow(QMainWindow):
         page.update_settings(self.settings)
         self.stack.currentWidget().show()
 
-        self.center_on_screen()
         self.setFixedSize(self.sizeHint())
+        self.center_on_screen()
+
+        self.log_viewer.appendPlainText("""The issue was that
+HLogViewer
+ (which inherits from
+HPlainTextEdit
+) was displaying an I-beam cursor (text selection cursor) even though it was in read-only mode. While
+HPlainTextEdit
+ correctly set the widget's cursor to ArrowCursor when read-only, it failed to update the viewport's cursor, which defaults to IBeamCursor in QPlainTextEdit. This caused the cursor to turn into an 'I' when hovering over the log viewer area, which appears directly below the log button when toggled.
+
+I fixed this by updating HPlainTextEdit.setReadOnly in
+a:\\hwidgets\\hwidgets\\plain_text_edit.py
+ to explicitly set the viewport's cursor to ArrowCursor when read-only is enabled.
+
+I verified the fix using a reproduction script that checked the cursor shape of both the button and the log viewer's viewport.""")
+
 
 
 
@@ -320,20 +342,24 @@ class InstallerWindow(QMainWindow):
     def slot_toggle_log(self, b: bool):
         window_height = self.height()
         # Use fixed log viewer height plus spacing
-        log_height = self.log_viewer_height + 2 * self.log_spacing
+        log_height = self.log_viewer_height +  self.log_spacing
         was_visible: bool = self.log_viewer.isVisible()
+
+        # Get widget under cursor BEFORE layout change
+        global_pos = QCursor.pos()
+        widget_before = QApplication.widgetAt(global_pos)
 
         self.blockSignals(True)
         if not was_visible and b:
             # Show log viewer and expand window height
-            self.log_viewer.show()
             new_height = window_height + log_height
             self.setFixedSize(self.width(), new_height)
+            self.log_viewer.show()
 
         elif was_visible and not b:
             # Hide log viewer and shrink window height
-            new_height = window_height - log_height
             self.log_viewer.hide()
+            new_height = window_height - log_height
             self.setFixedSize(self.width(), new_height)
 
         self.blockSignals(False)
@@ -460,7 +486,7 @@ class InstallerWindow(QMainWindow):
             self.info.setVisible(False)
 
         # Resize window to fit the new page
-        QTimer.singleShot(0, self._resize_to_current_page)
+        # QTimer.singleShot(0, self._resize_to_current_page)
 
 
     def slot_go_previous(self):
@@ -480,8 +506,6 @@ class InstallerWindow(QMainWindow):
                 # No progress bar, next button stays enabled
                 self.next_button.setEnabled(True)
 
-            # Resize window to fit the new page
-            QTimer.singleShot(0, self._resize_to_current_page)
 
 
     def slot_cancel(self):

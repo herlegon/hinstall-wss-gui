@@ -50,12 +50,12 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
         # Remove minimum height constraint to allow proper expansion
         self.disclaimer.setMinimumHeight(0)
         self.disclaimer.setMaximumHeight(16777215)  # Remove any max height constraint
-        
+
         # Set maximum width to match content area (window width - padding)
         # This is necessary for QLabel to properly calculate height for word-wrapped text
         content_width = 900 - (64 * 2)  # window width - horizontal padding
         self.disclaimer.setMaximumWidth(content_width)
-        
+
         font = QFont(
             self.disclaimer.font().family(),
             pointSize=8,
@@ -63,7 +63,7 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
             italic=True,
         )
         self.disclaimer.setFont(font)
-        
+
         # Modify the vertical spacer to not take space from disclaimer
         # Find the spacer item in the layout
         for i in range(self.selection_layout.count()):
@@ -73,35 +73,25 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
                 spacer = item.spacerItem()
                 spacer.changeSize(20, 8, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 break
-        
+
         # Force the disclaimer to recalculate its size based on content
         self.disclaimer.adjustSize()
         self.disclaimer.updateGeometry()
-        
+
         # Explicitly set minimum height based on size hint to ensure full text is visible
         hint_height = self.disclaimer.sizeHint().height()
         self.disclaimer.setMinimumHeight(hint_height)
-        
+
         # Invalidate layouts to force recalculation
         self.selection_layout.invalidate()
         self.selection_layout.activate()
         self.main_layout.invalidate()
         self.main_layout.activate()
-        
+
         # Update the page geometry
         self.updateGeometry()
-        
+
         self.reset_widgets()
-
-
-    def paintEvent(self, event: QPaintEvent) -> None:
-        super().paintEvent(event)
-        painter = QPainter(self)
-        # if DEBUG_GEOMETRY:
-        draw_widget_rect(self, painter, color="red")
-        painter.end()
-
-
 
 
     def reset_widgets(self) -> None:
@@ -109,12 +99,13 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
 
         # Use by default
         self.radio_button_minimal.setChecked(True)
-
+        self.line_edit_ffmpeg_dir.setText("")
+        self.line_edit_ffmpeg_dir.setEnabled(False)
+        self.outlined_button_browse.setEnabled(False)
 
 
     def update_settings(self, settings: dict[str, Any]) -> None:
         self.set_default_settings(settings=settings)
-
 
 
     def get_selection(self) -> FfmpegSelection:
