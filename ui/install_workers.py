@@ -1,123 +1,126 @@
-import sys
-import time
-from pathlib import Path
-from typing import List
-from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QStackedWidget, QLabel, QPushButton, QProgressBar, QCheckBox,
-    QRadioButton, QButtonGroup, QFileDialog, QTextEdit, QFrame,
-    QGraphicsDropShadowEffect, QSizePolicy
-)
-from PySide6.QtCore import Qt, QThread, Signal, QPoint, QTimer, QSize
-from PySide6.QtGui import QFont, QColor, QIcon, QPainter, QPainterPath, QRegion
+import logging
+from PySide6.QtCore import QThread, Signal
+from hinstall import download_install_ext_packages, ExtPackages, ilog
+from hinstall.logger import STATUS
+from hinstall.install_worker import InstallWorker
 
-
-class InstallWorker(QThread):
-    """Worker thread for simulating installation process.
-    
-    For demo purposes, uses a 3-second timer.
-    Tracks files created/modified during installation.
-    """
-    progress = Signal(int)
-    status = Signal(str)
-    finished_signal = Signal(bool, list)  # success, list of files
-
-    def __init__(self, steps):
+class WorkerLogHandler(logging.Handler):
+    def __init__(self, worker):
         super().__init__()
-        self.steps = steps
-        self.installed_files: List[str] = []
-        self._cancelled = False
+        self.worker: PackagesInstallWorker = worker
+        self.addFilter(lambda r: r.levelno == STATUS)
 
-    def cancel(self):
-        """Request cancellation of the installation."""
-        self._cancelled = True
+    def format(self, record: logging.LogRecord) -> str:
+        return record.getMessage()
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.worker.handle_log_message(msg)
+
+
+
+class PackagesInstallWorker(QThread):
+    progress = Signal(float)
+    task_name = Signal(str)
+    finished = Signal(bool, list)
+
+    def __init__(self, packages: ExtPackages, reinstall: bool = True, threads: int = 1, use_local_host: bool = True):
+        super().__init__()
+        self.packages = packages
+        self.reinstall = reinstall
+        self.threads = threads
+        self.use_local_host = use_local_host
+        self.total_packages = len(packages) if packages else 0
+        self.current_package = 0
 
     def run(self):
-        """Simulate installation with a 3-second timer for demo."""
+        # Create handler
+        handler = WorkerLogHandler(self)
+        handler.setFormatter(logging.Formatter('[S] %(message)s'))
+        ilog.addHandler(handler)
+
         try:
-            # Demo: 3 second installation with 10 update steps
-            total_time_ms = 3000
-            update_interval_ms = 100
-            num_updates = total_time_ms // update_interval_ms
-            
-            for i in range(num_updates):
-                if self._cancelled:
-                    self.status.emit("Installation cancelled")
-                    self.finished_signal.emit(False, self.installed_files)
-                    return
-                
-                # Update progress
-                progress = int((i + 1) * 100 / num_updates)
-                self.progress.emit(progress)
-                
-                # Simulate different status messages
-                if i < num_updates // 3:
-                    step_name = self.steps[0] if self.steps else "Downloading..."
-                elif i < 2 * num_updates // 3:
-                    step_name = self.steps[1] if len(self.steps) > 1 else "Installing..."
-                else:
-                    step_name = self.steps[2] if len(self.steps) > 2 else "Finalizing..."
-                
-                self.status.emit(step_name)
-                
-                # Simulate file creation at different stages
-                if i == num_updates // 4:
-                    self.installed_files.append("/tmp/demo_file_1.txt")
-                elif i == num_updates // 2:
-                    self.installed_files.append("/tmp/demo_file_2.txt")
-                    self.installed_files.append("/tmp/demo_lib.so")
-                elif i == 3 * num_updates // 4:
-                    self.installed_files.append("/tmp/demo_config.ini")
-                
-                self.msleep(update_interval_ms)
-            
-            # Completion
-            self.progress.emit(100)
-            self.status.emit("Installation complete")
-            self.finished_signal.emit(True, self.installed_files)
-            
-        except Exception as e:
-            self.status.emit(f"Error: {str(e)}")
-            self.finished_signal.emit(False, self.installed_files)
+            installed = download_install_ext_packages(
+                packages=self.packages,
+                reinstall=self.reinstall,
+                threads=self.threads,
+                use_local_host=self.use_local_host
+            )
 
-
-class CleanupWorker(QThread):
-    """Worker thread for cleaning up installed files.
-    
-    Shows progress while removing files that were installed.
-    """
-    progress = Signal(int)
-    status = Signal(str)
-    finished_signal = Signal(bool)
-
-    def __init__(self, files_to_remove: List[str]):
-        super().__init__()
-        self.files_to_remove = files_to_remove
-
-    def run(self):
-        """Remove files and report progress."""
-        try:
-            total = len(self.files_to_remove)
-            if total == 0:
-                self.status.emit("No files to remove")
+            if installed:
                 self.progress.emit(100)
-                self.finished_signal.emit(True)
-                return
-            
-            for i, file_path in enumerate(self.files_to_remove):
-                self.status.emit(f"Removing {Path(file_path).name}...")
-                
-                # Simulate file removal (for demo, don't actually delete)
-                # In production: Path(file_path).unlink(missing_ok=True)
-                self.msleep(200)  # Simulate deletion time
-                
-                progress = int((i + 1) * 100 / total)
-                self.progress.emit(progress)
-            
-            self.status.emit("Cleanup complete")
-            self.finished_signal.emit(True)
-            
+                self.finished.emit(True, [])
+            else:
+                self.finished.emit(False, [])
+
         except Exception as e:
-            self.status.emit(f"Cleanup error: {str(e)}")
-            self.finished_signal.emit(False)
+            self.task_name.emit(f"Error: {str(e)}")
+            self.finished.emit(False, [])
+        finally:
+            ilog.removeHandler(handler)
+
+
+    def handle_log_message(self, msg: str):
+        task_code = msg[1:3]
+        payload = msg[4:]
+        # self.task_name.emit(msg)
+        # print(f"[{msg}] code={task_code}, msg={payload}")
+
+        if task_code == "sd":
+            # Start download...
+            pkg_name = payload
+            self.task_name.emit(f"Downloading {pkg_name}...")
+            self.progress.emit(0)
+
+        if task_code == "rd":
+            # Retry download...
+            pkg_name = payload
+            self.task_name.emit(f"Retry to download {pkg_name}...")
+            self.progress.emit(0)
+
+        elif task_code == "si":
+            # start installing package
+            pkg_name = payload
+            self.task_name.emit(f"Installing {pkg_name}...")
+            self.progress.emit(0)
+
+        elif task_code == "pg":
+            # progress
+            value = float(payload)
+            # print(f"refresh progress to {value}: {type(value)}")
+            self.progress.emit(value)
+
+        elif task_code == "ed":
+            # ended
+            pkg_name = payload
+            self.progress.emit(100.)
+            self.task_name.emit(f"{pkg_name} downloaded.")
+
+        elif task_code == "ei":
+            # ended
+            pkg_name = payload
+            self.progress.emit(100.)
+            self.task_name.emit(f"{pkg_name} installed.")
+
+        elif task_code == "if":
+            # Failed
+            pkg_name = payload
+            self.progress.emit(0.)
+            self.task_name.emit(f"Failed to install {pkg_name}...")
+
+        elif task_code == "df":
+            # Failed
+            pkg_name = payload
+            self.progress.emit(0.)
+            self.task_name.emit(f"Failed to download {pkg_name}...")
+
+        elif task_code == "cm":
+            # custom message
+            self.task_name.emit(payload)
+
+        elif task_code == "ce":
+            # critcial error
+            self.task_name.emit(payload)
+            # end of worker, exit
+            # cannot install
 

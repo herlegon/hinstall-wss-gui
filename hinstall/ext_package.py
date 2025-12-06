@@ -244,9 +244,8 @@ class ExtPackage:
             raise ValueError(f"local_host must be defined")
 
         local_fp: Path = g_backend_dirs.local_host / self.filename
-        ilog.info(f"[{self.name}] download from local host")
-        ilog.info(f"[{self.name}][dl]pprogress=0")
-        ilog.debug(f"{self.name}: {local_fp}")
+        ilog.debug(f"[{self.name}] download from local host: {local_fp}")
+        ilog.status(f"[sd]{self.name}")
 
         if local_fp.exists():
             self._update_cache_file()
@@ -258,10 +257,13 @@ class ExtPackage:
             self.downloaded = True
 
         else:
-            ilog.error(f"[{self.name}] missing file: {local_fp}")
+            ilog.error(f"File is missing")
             self.downloaded = False
 
-        ilog.info(f"[{self.name}][dl]pprogress=100")
+        if self.downloaded:
+            ilog.status(f"[ed]{self.name}")
+        else:
+            ilog.status(f"[fd]{self.name}")
         return self.downloaded
 
 
@@ -270,9 +272,9 @@ class ExtPackage:
 
         if not self.tag:
             ilog.error(f"Tag file not valid for package: {self.name}")
+            ilog.status(f"[ce]{self.name}: tag is not valid.")
             return False
 
-        ilog.info(f"[{self.name}][dl]pprogress=0")
         # Force to false because we clean the cache directories
         self.downloaded = False
 
@@ -283,12 +285,12 @@ class ExtPackage:
         if tag_file.exists():
             tag_file.unlink()
 
-        ilog.debug(f"Download package: {self.filename}")
+        ilog.debug(f"Download package: {self.filename} to {tmp_dir}")
 
         _retry: int = self.retry_count
         while _retry:
-            ilog.debug(f"Downloading: {self.name} to {tmp_dir}")
-            ilog.info(f"[{self.name}][dl]total={self.size}")
+            ilog.status(f"[sd]{self.name}")
+            ilog.status(f"[pg]0.")
 
             with open(self.cache_file, "wb") as f:
                 try:
@@ -297,8 +299,8 @@ class ExtPackage:
                     # Update every 512KB
                     wrapper = ProgressWrapper(
                         self.response.raw,
-                        task_name=f"[{self.name}][dl]",
-                        update_threshold=512*1024
+                        total_size=self.size,
+                        update_threshold=512*1024,
                     )
 
                     # 256KB buffer
@@ -307,32 +309,31 @@ class ExtPackage:
                     wrapper.flush_progress()
 
                 except Exception as e:
-                    ilog.debug(f"[W] Retry download, error: {type(e)}")
+                    ilog.debug(f"[W] Retry to download. Reason: {type(e)}")
                     _retry -= 1
 
             if _retry == 0:
-                ilog.debug(f"[E] failed downloading {self.filename}")
-                ilog.info(f"[{self.name}][dl]progress=-1")
+                ilog.debug(f"[E] failed to download {self.filename}")
+                ilog.status(f"[df]{self.name}")
                 return False
 
             _retry = 0
 
-
         tag_file.touch()
         self.downloaded = True
-        ilog.info(f"[{self.name}][dl]progress={self.size}")
-
+        ilog.status(f"[ed]{self.name}")
         return True
 
 
 
     def install(self) -> bool:
+        installed: bool = False
         self.installed = False
+
         if not self.downloaded:
             ilog.error(f"Cannot install {self.name}. Reason: not downloaded")
+            ilog.status(f"[if]{self.name}")
             return False
-
-        installed: bool = False
 
         install_dir = self.install_dir
         ilog.debug(f"Install: {self.name} in {install_dir}")
@@ -353,15 +354,14 @@ class ExtPackage:
         ):
             import tarfile
 
-            task_name = f"[{self.name}][install]"
             compression = extension.lstrip('.')
             try:
                 with tarfile.open(self.cache_file, f"r:{compression}") as tar_file:
                     extract_tar_file(
-                        tar_file,
+                        pkg_name=self.name,
+                        compressed_data=tar_file,
                         install_dir=install_dir,
                         exclude=exclude,
-                        task_name=task_name
                     )
                     installed = True
             except Exception as e:
@@ -370,29 +370,35 @@ class ExtPackage:
         elif extension == '.zip':
             import zipfile
 
-            task_name = f"[{self.name}][install]"
             try:
                 with zipfile.ZipFile(self.cache_file, "r") as zip_file:
                     extract_zip_file(
-                        zip_file,
+                        pkg_name=self.name,
+                        compressed_data=zip_file,
                         install_dir=install_dir,
                         exclude=exclude,
-                        task_name=task_name,
                     )
                     installed = True
             except Exception as e:
                 ilog.error(f"Failed to untar {self.cache_file}. Reason: {str(e)}")
 
         else:
-            shutil.move(self.cache_file, install_dir)
+            try:
+                shutil.move(self.cache_file, install_dir)
+                installed = True
+            except Exception as e:
+                ilog.error(f"Failed to copy {self.cache_file} to {install_dir}. Reason: {str(e)}")
 
-        (install_dir / self.tag).touch()
-        self.installed = True
-
-        ilog.debug(f"{self.name} installed in {install_dir}")
 
         if installed:
+            (install_dir / self.tag).touch()
             self.clean_cache()
+
+            ilog.debug(f"{self.name} installed in {install_dir}")
+            ilog.status(f"[ei]{self.name}")
+
+        else:
+            ilog.status(f"[if]{self.name}")
 
         self.installed = installed
 

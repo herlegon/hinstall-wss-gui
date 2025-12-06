@@ -5,32 +5,60 @@ from typing import Optional
 from hytils import darkgrey, green, yellow, red
 
 
+STATUS = 15
+logging.addLevelName(STATUS, "STATUS")
+
+
 class ColorFormatter(logging.Formatter):
     COLORS = {
         logging.DEBUG: darkgrey,
         logging.INFO: green,
+        STATUS: lambda x: x,
         logging.WARNING: yellow,
         logging.ERROR: red,
         logging.CRITICAL: red,
     }
 
+    LEVEL_PREFIX = {
+        logging.DEBUG: "[D]",
+        5: "[V]",
+        logging.INFO: "[I]",
+        STATUS: "",
+        logging.WARNING: "[W]",
+        logging.ERROR: "[E]",
+        logging.CRITICAL: "[C]",
+    }
+
     def format(self, record: logging.LogRecord) -> str:
-        color_fn = self.COLORS.get(record.levelno, lambda x: x)
-        msg = super().format(record)
+        level_no: int = record.levelno
+        if level_no == STATUS:
+            return record.getMessage()
 
-        # Use relative path for readability
-        try:
-            rel_path = os.path.relpath(record.pathname)
-        except ValueError:
-            rel_path = os.path.basename(record.pathname)
+        color_fn = self.COLORS.get(level_no, lambda x: x)
+        prefix: str = self.LEVEL_PREFIX.get(level_no, f"{level_no}")
+        if level_no < logging.INFO:
+            # Use relative path for readability
+            try:
+                rel_path = os.path.relpath(record.pathname)
+            except ValueError:
+                rel_path = os.path.basename(record.pathname)
+            link = f"{rel_path}:{record.lineno}"
+            formatted = color_fn(f"{prefix}") + f"{record.getMessage()}  ({link})"
 
-        filename = darkgrey(os.path.basename(record.pathname))
-        link = f"{rel_path}:{record.lineno}"
+        else:
+            formatted = color_fn(f"{prefix}") + f"{record.getMessage()}"
 
-        # formatted = f"[{record.levelname}]  {filename}: {record.getMessage()}  ({link})"
-        formatted = color_fn(f"[{record.levelname}]") + f" {record.getMessage()}  ({link})"
         return formatted
 
+
+
+class HInstallLogger(logging.Logger):
+    def status(self, msg, *args, **kwargs):
+        if self.isEnabledFor(STATUS):
+            self._log(STATUS, msg, args, **kwargs)
+
+
+logging.setLoggerClass(HInstallLogger)
 
 
 def setup_alog(
@@ -67,7 +95,7 @@ def setup_alog(
 
 
 # Default initialization (basic mode)
-ilog: logging.Logger = setup_alog(to_stdout=True)
+ilog: HInstallLogger = setup_alog(to_stdout=True)
 
 
 

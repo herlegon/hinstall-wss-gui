@@ -60,7 +60,7 @@ def dl_and_install_ext_package(
         package.install()
 
     if package.installed:
-        ilog.info(f"{package.name}: installed")
+        ilog.status(f"Installed {package.name}.")
     else:
         ilog.error(f"{package.name}: failed to install")
 
@@ -75,6 +75,10 @@ def download_install_ext_packages(
     reinstall: bool = False,
     use_local_host: bool = False,
 ) -> bool:
+    """Entry point to install packages.
+    Use only a single thread when used with GUI because of progress bar
+    """
+
     if isinstance(packages, list):
         packages = [package for package in packages if not package.skip]
     else:
@@ -84,13 +88,15 @@ def download_install_ext_packages(
             else []
         )
 
+    if use_local_host and g_backend_dirs.local_host is None:
+        ilog.error("g_backend_dirs.local_host shall be set before downloading")
+        return False
+
     for pkg in packages:
         pkg.use_local_host = use_local_host
         pkg.retry_count = retry
 
-
     threads = min(max(threads, 1), len(packages))
-
     if threads == 1:
         for package in packages:
             success = dl_and_install_ext_package(

@@ -46,7 +46,6 @@ from hwidgets import (
     HProgressBar,
 )
 from PySide6.QtWidgets import QDialog, QLabel
-from .install_workers import CleanupWorker
 
 from .title_bar import TitleBar
 

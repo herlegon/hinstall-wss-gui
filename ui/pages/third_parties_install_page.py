@@ -3,6 +3,7 @@ import sys
 from typing import Any, Type
 from PySide6.QtCore import (
     Signal,
+    Qt,
 )
 from PySide6.QtGui import (
     QPaintEvent,
@@ -12,10 +13,6 @@ from PySide6.QtWidgets import (
     QWidget,
     QSizePolicy
 )
-from hinstall import (
-    ExtPackages,
-    download_install_ext_packages,
-)
 from hwidgets import (
     Theme,
 )
@@ -23,7 +20,15 @@ from hytils import lightgreen, red, yellow
 from ..designer.ui_third_party_install_widget import Ui_ThirdPartiesInstall
 from .page import Page
 from .ffmpeg_selection_page import FfmpegSelection
-from ..install_workers import InstallWorker
+from ..install_workers import InstallWorker, PackagesInstallWorker
+
+from hinstall import (
+    parse_config_,
+    ExtPackages,
+    g_backend_dirs,
+    download_install_ext_packages,
+)
+from tests.local_rehost import get_rehost_dir
 
 
 class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
@@ -38,6 +43,8 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
         self.setupUi(self, theme=theme)
         self._step_label = "Third parties"
         self.progress_bar.setValue(0)
+        self.progress_bar.setAnimationDuration(20)
+        self.indicator_progress.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         # Settings used to filter some packages to install
         self.settings = {}
@@ -73,72 +80,61 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
 
 
     def start_installation(self):
-        print(red("start install"))
-        print(self.packages)
 
         # No packages to install
         if self.packages is None or not self.packages:
-            self._on_finished(success=True, files=[])
+            self.slot_on_finished(success=True, files=[])
             return
 
+        # Set the local rehost
+        g_backend_dirs.local_host = get_rehost_dir()
 
-        print(self.packages)
 
-        installed: bool = download_install_ext_packages(
+        # Create and start worker
+        self.worker: PackagesInstallWorker = PackagesInstallWorker(
             packages=self.packages,
             reinstall=True,
             threads=1,
             use_local_host=True
         )
-        if installed:
-            print(lightgreen("All packages installed"))
-
-        else:
-            self.progress_bar.setValue(0)
-            self.indicator_step.setText("Failed.")
-            self.indicator_progress
-            print(red("Error: missing package(s)"))
-
-        # """Start the installation worker."""
-        # steps = [
-        #     "Downloading third-party software...",
-        #     "Installing components...",
-        #     "Finalizing installation..."
-        # ]
-
-        # # Create and start worker
-        # self.worker = InstallWorker(steps)
-        # self.worker.progress.connect(self._update_progress)
-        # self.worker.status.connect(self.label.setText)
-        # self.worker.finished_signal.connect(self._on_finished)
-
-        # # Reset progress bar
-        # self.progress_bar.setValue(0)
-        # self.label_2.setText("0%")
+        self.worker.progress.connect(self.slot_update_progress)
+        self.worker.task_name.connect(self.indicator_step.setText)
+        self.worker.finished.connect(self.slot_on_finished)
 
         # Start worker
-        # self.worker.start()
+        self.worker.start()
 
 
-    def _update_progress(self, value: int):
+
+    def slot_update_progress(self, value: int):
         """Update progress bar and percentage label."""
+        duration: int = 0
+        if value == 100:
+            duration = self.progress_bar.getAnimationDuration()
+            self.progress_bar.setAnimationDuration(0)
+
         self.progress_bar.setValue(value)
         self.indicator_progress.setText(f"{value}%")
 
+        if duration:
+            self.progress_bar.setAnimationDuration(value)
 
-    def _on_finished(self, success: bool, files: list):
+
+    def slot_on_finished(self, success: bool, files: list):
         """Handle completion of installation."""
         self._installation_started = False
+
+        duration = self.progress_bar.getAnimationDuration()
+        self.progress_bar.setAnimationDuration(0)
         self.progress_bar.setValue(100)
+        self.progress_bar.setAnimationDuration(duration)
 
         if success:
-            self.indicator_step.setText("Installation complete.")
-            self.indicator_progress.setText("100%")
+            self.indicator_progress.setText("✅")
             self.installed_files = files
             self.completed.emit(True)
         else:
-            self.indicator_step.setText("Installation failed.")
-            self.indicator_progress.setText("✗")
+            self.indicator_progress.setText("❌")
             self.completed.emit(False)
 
 

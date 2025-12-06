@@ -134,6 +134,7 @@ do_cache = false
 ffmpeg = "FFmpeg"
 vspython = "VS python"
 avs = "AviSynth+ plugins"
+python = "Python"
 
 [py_packages.names]
 directml = "Direct ML"

@@ -83,7 +83,6 @@ class Ui_ThirdPartiesInstall(object):
 
         self.verticalLayout_2 = QVBoxLayout()
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.verticalLayout_2.setContentsMargins(16, -1, -1, -1)
         self.verticalSpacer_2 = QSpacerItem(511, 37, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         self.verticalLayout_2.addItem(self.verticalSpacer_2)

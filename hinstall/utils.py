@@ -40,16 +40,22 @@ def check_site_reachable(url: str, max_retries: int = 3):
             ilog.debug(f"{url} is not reachable, retry {attempt} - {e}")
             if attempt < max_retries - 1:
                 continue
+    ilog.status(f"[ce] Site is not reachable: {get_domain_from_url(url)}")
     return False
 
 
 
 class ProgressWrapper:
-    def __init__(self, raw_response, task_name: str = "", update_threshold=512*1024):
+    def __init__(
+        self,
+        raw_response,
+        total_size: int,
+        update_threshold=512*1024,
+    ):
         self.raw = raw_response
         self.update_threshold = update_threshold
-        self.task_name = task_name
         self.bytes_downloaded = 0
+        self.total_size = total_size
         self.last_time = time.time()
 
 
@@ -59,10 +65,9 @@ class ProgressWrapper:
             self.bytes_downloaded += len(data)
             if self.bytes_downloaded >= self.update_threshold:
                 if time.time() - self.last_time >= 0.25:
-                    ilog.info(f"{self.task_name}progress={self.bytes_downloaded}")
+                    ilog.info(f"[pg]{min(100. * self.bytes_downloaded/self.total_size, 100):.1f}")
                 self.bytes_downloaded = 0
             self.last_time = time.time()
-
         return data
 
 
@@ -74,12 +79,14 @@ class ProgressWrapper:
 
 
 def extract_zip_file(
+    pkg_name: str,
     compressed_data: ZipFile,
     install_dir: Path,
     exclude: list[str] = [],
     task_name: str = "",
 ) -> None:
     """Extract ZIP archive with progress tracking, excluding specified names"""
+    ilog.status(f"[si]{pkg_name}")
 
     def should_exclude(path: Path) -> bool:
         """Check if any part of the path matches excluded names"""
@@ -104,8 +111,6 @@ def extract_zip_file(
         if not f.endswith('/')
     )
 
-    ilog.info(f"{task_name}:total={total_bytes}")
-
     # Extract files
     for file in all_files:
         if file.endswith('/'):
@@ -128,42 +133,45 @@ def extract_zip_file(
             with compressed_data.open(file) as source:
                 target_path.write_bytes(source.read())
 
-        ilog.info(f"{task_name}:progress={file_size}")
+        ilog.status(f"[pg]{min(100. * file_size/total_bytes, 100):.1f}")
+    ilog.status(f"[ei]{pkg_name}")
+
 
 
 def extract_tar_file(
+    pkg_name,
     compressed_data: TarFile,
     install_dir: Path,
     exclude: list[str] = None,
-    task_name: str = "",
 ) -> None:
     start_time = time.time()
     if True:
         _extract_tar_file_file_count(
+            pkg_name,
             compressed_data,
             install_dir,
             exclude,
-            task_name,
         )
     else:
         _extract_tar_file_file_size(
+            pkg_name,
             compressed_data,
             install_dir,
             exclude,
-            task_name,
         )
     print(f"elapsed: {time.time() - start_time}")
 
 
 def _extract_tar_file_file_size(
+    pkg_name: str,
     compressed_data: TarFile,
     install_dir: Path,
     exclude: list[str] = None,
-    task_name: str = "",
 ) -> None:
     """Extract TAR archive with progress tracking (based on file sizes),
        excluding specified names, without double extraction.
     """
+    ilog.status(f"[si]{pkg_name}")
 
     if exclude is None:
         exclude = []
@@ -183,8 +191,6 @@ def _extract_tar_file_file_size(
     has_single_root = len(root_folders) == 1
     root_folder = next(iter(root_folders)) if has_single_root else None
 
-    ilog.info(f"{task_name}:total={total_bytes}")
-
     # ---------- EXTRACTION ----------
     extracted_bytes = 0
 
@@ -198,7 +204,7 @@ def _extract_tar_file_file_size(
 
         # Skip excluded paths
         if not should_exclude(file_path):
-            ilog.info(f"{task_name}:progress={member.size}")
+            # ilog.info(f"{task_name}:progress={member.size}")
             continue
 
         target_path = install_dir / file_path
@@ -225,19 +231,21 @@ def _extract_tar_file_file_size(
             target_path.hardlink_to(install_dir / link_target)
 
         # Progress update (only for actual file data)
-        ilog.info(f"{task_name}:progress={extracted_bytes}")
+        ilog.status(f"[pg]{min(100. * extracted_bytes/total_bytes, 100):.1f}")
         extracted_bytes += member.size
-    ilog.info(f"{task_name}:progress={total_bytes}")
+
+    ilog.status(f"[ei]{pkg_name}")
 
 
 
 def _extract_tar_file_file_count(
+    pkg_name: str,
     compressed_data: TarFile,
     install_dir: Path,
     exclude: list[str] = [],
-    task_name: str = "",
 ) -> None:
     """Extract TAR archive with progress tracking, excluding specified names"""
+    ilog.status(f"[si]{pkg_name}")
 
     def should_exclude(path: Path) -> bool:
         """Check if any part of the path matches excluded names"""
@@ -253,7 +261,7 @@ def _extract_tar_file_file_count(
     has_single_root = len(root_folders) == 1
     root_folder = next(iter(root_folders)) if has_single_root else None
 
-    ilog.info(f"{task_name}total={total_files}")
+    ilog.info(f"Extract {total_files} files")
 
     # Extract files
     extracted_count = 0
@@ -267,8 +275,8 @@ def _extract_tar_file_file_count(
                 file_path = file_path.relative_to(root_folder)
 
         # skip excluded
-        if should_exclude(file_path):
-            ilog.info(f"{task_name}:progress={extracted_count}")
+        # if should_exclude(file_path):
+        #     ilog.info(f"{task_name}progress={extracted_count}")
 
         target_path = install_dir / file_path
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -295,8 +303,8 @@ def _extract_tar_file_file_count(
 
         # update progress
         if time.time() - last_time >= 0.1:
-            ilog.info(f"{task_name}:progress={extracted_count}")
+            ilog.status(f"[pg]{min(100. * extracted_count/total_files, 100):.1f}")
             last_time = time.time()
         extracted_count += 1
 
-    ilog.info(f"{task_name}:progress={total_files}")
+    ilog.status(f"[ei]{pkg_name}")
