@@ -66,9 +66,8 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
 
     def update_settings(self, settings: dict[str, Any]) -> None:
         self.settings: dict = settings
-        self.packages = None
 
-        self.packages = self.settings.get('packages', None)
+        self.packages: ExtPackages = self.settings.get('packages', None)
         if self.packages is None:
             return
 
@@ -89,15 +88,19 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
             self.slot_on_finished(success=True, files=[])
             return
 
+        if 'cache' in self.settings and not self.settings['cache']:
+            for p in self.packages:
+                p.do_cache = False
+
         # Set the local rehost
         g_backend_dirs.local_host = get_rehost_dir()
 
         # Create and start worker
         self.worker: PkgInstallWorker = PkgInstallWorker(
             packages=self.packages,
-            reinstall=True,
+            reinstall=False,
             threads=1,
-            use_local_host=True
+            use_local_host=self.settings.get('devmode', False)
         )
         self.worker.progress.connect(self.slot_update_progress)
         self.worker.task_name.connect(self.indicator_step.setText)

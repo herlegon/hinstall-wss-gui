@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: Parse command-line arguments
-if "%~1"=="--skip" (
+if "%~1"=="--skip-ui" (
     echo Skip UI flag detected, skipping UI generation...
 
 ) else (

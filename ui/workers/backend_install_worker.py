@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 import subprocess
 import sys
+import threading
 import time
 from typing import Any
 from PySide6.QtCore import QThread, Signal
@@ -20,17 +21,21 @@ from hinstall import (
     get_python_version,
     ilog,
 )
+from hytils import yellow
 from tests.test_ws_install import WebSocketClient
 from .log_handler import WorkerLogHandler
 from websockets import (
-    connect
+    connect,
+    ClientConnection,
+    ConnectionClosedError,
+    ConnectionClosedOK,
 )
-
 
 class BackendInstallWorker(QThread):
     progress = Signal(float)
     task_name = Signal(str)
     finished = Signal(bool, list)
+
 
     def __init__(
         self,
@@ -38,6 +43,7 @@ class BackendInstallWorker(QThread):
     ):
         super().__init__()
         self.user_settings = user_settings
+        self._backend_process: subprocess.Popen = None
 
 
     def run(self):
@@ -94,55 +100,6 @@ class BackendInstallWorker(QThread):
                 backend_env['PATH'] + f"{sep}{backend_script_fp.parent}"
             )
 
-        # Port detection
-        found_port = None
-        start_server = True
-
-        # Check ports
-        for port in range(49990, 49999):
-            # Probing
-            status = asyncio.run(self.probe_port(port))
-
-            if status == "WS_SERVER":
-                ilog.info(f"Found existing backend server on port {port}.")
-                ilog.removeHandler(handler)
-                return
-
-            elif status == "KILLED":
-                # Verify that it is really free
-                verified = False
-                for i in range(3):
-                    time.sleep(1)
-                    v_status = asyncio.run(self.probe_port(port))
-                    if v_status == "FREE":
-                        verified = True
-                        break
-                    ilog.info(f"Port {port} verified status={v_status} (attempt {i+1}/3)")
-
-                if verified:
-                    found_port = port
-                    break
-                else:
-                    ilog.error(f"Port {port} failed verification after 3 attempts.")
-                    self.task_name.emit("Failed to verify port availability.")
-                    self.finished.emit(False, [])
-                    ilog.removeHandler(handler)
-                    return
-
-            elif status == "FREE":
-                found_port = port
-                break
-
-            else: # BUSY
-                ilog.info(f"Port {port} is busy, trying next...")
-
-        if found_port is None:
-            ilog.error("Could not find a free port for backend.")
-            self.task_name.emit("Failed to start backend.")
-            self.finished.emit(False, [])
-            ilog.removeHandler(handler)
-            return
-
         if True:
             ilog.debug(f"Backend environment:")
             for k, v in backend_env.items():
@@ -153,69 +110,181 @@ class BackendInstallWorker(QThread):
                     f"  {k}: {v}"
                 )
 
+        # Port detection
+        found_port = self.get_free_port()
+        if found_port is None:
+            ilog.removeHandler(handler)
+            ilog.critical(f"Another installation is on going or port is used by another process.")
+            self.task_name.emit("Failed to start backend.")
+            self.finished.emit(False, [])
+            return
+
         self.process = None
         self.client = None
 
-        try:
-            cmd = [str(g_backend_dirs.python_exe), backend_script_fp, "--port", str(found_port)]
-            ilog.info(f"Starting backend: {cmd}")
+        cmd = [
+            str(g_backend_dirs.python_exe),
+            "-u",
+            backend_script_fp,
+            "--port",
+            str(found_port)
+        ]
+        ilog.info(f"Starting backend: {cmd}")
 
-            self.process = subprocess.Popen(
+        try:
+            self._backend_process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=backend_env,
-                text=True
+                stderr=subprocess.PIPE,
+                bufsize=1,
+                universal_newlines=True,  # gives str lines, cross-platform
+                start_new_session=False,  # keeps it tied to parent process group
             )
 
             uri = f"ws://127.0.0.1:{found_port}"
             self.client = WebSocketClient(uri)
 
-            # Start the client loop (blocking this thread, but handling async)
-            asyncio.run(self.client.start())
+            # Wait until backend prints "READY"
+            for line in iter(self._backend_process.stdout.readline, ""):
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                if "READY" in line:
+                    ilog.info("The backend server is ready to work")
+                    self._last_pong = time.time()
+                    self._is_server_ready = True
+                      # Signal that server is ready
+                    # self._server_ready_event.set()
+                    ilog.info("Backend is ready")
+                    break
 
-        except Exception as e:
-            ilog.error(f"Backend worker error: {e}")
-            self.task_name.emit("Failed to run the backend.")
-            self.progress.emit(0)
-            self.finished.emit(False, [])
+            # Forward stdout
+            def forward(stream, target):
+                for line in iter(stream.readline, ""):
+                    target.write(line)
+                    target.flush()
+                    line = line.rstrip()
+                    # print(line)
+                    # try:
+                    #     self.signal_log.emit(line)
+                    # except:
+                    #     pass
+                stream.close()
+
+            threads = [
+                threading.Thread(target=forward, args=(self._backend_process.stdout, sys.stdout)),
+                threading.Thread(target=forward, args=(self._backend_process.stderr, sys.stderr)),
+            ]
+            ilog.info(f"Start the backend server")
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            return_code = self._backend_process.wait()
+            ilog.info(f"Backend exited with code {return_code}")
 
         finally:
-            if self.process:
-                # Check if process exited
-                exit_code = self.process.poll()
+            self._backend_process = None
 
-                # If it crashed early or was terminated, log output
-                if exit_code is not None and exit_code != 0:
-                     ilog.error(f"Backend process exited with code {exit_code}")
-                     try:
-                         # Read remaining output
-                         output = self.process.stdout.read()
-                         if output:
-                             ilog.error(f"Backend Output:\n{output}")
-                     except Exception as process_read_err:
-                         ilog.error(f"Failed to read backend output: {process_read_err}")
+        ilog.removeHandler(handler)
 
-                if exit_code is None:
-                    ilog.info("Terminating backend server process...")
-                    self.process.terminate()
-                    try:
-                        self.process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        self.process.kill()
 
-            ilog.removeHandler(handler)
+    def get_free_port(self) -> int| None:
+        found_port = None
+
+        # Check ports
+        for port in range(49990, 49991):
+            # Probing
+            status = asyncio.run(self.probe_port(port))
+
+            if status == "WS_SERVER":
+                ilog.info(f"Found existing backend server on port {port}.")
+                return None
+
+            elif status == "KILLED":
+                # Verify that it is really free
+                verified = False
+                for i in range(3):
+                    v_status = asyncio.run(self.probe_port(port))
+                    if v_status == "FREE":
+                        verified = True
+                        break
+                    ilog.info(f"Port {port} verified status={v_status} (attempt {i+1}/3)")
+
+                if verified:
+                    found_port = port
+                    break
+
+                else:
+                    ilog.error(f"Port {port} failed verification after 3 attempts.")
+                    self.task_name.emit("Failed to verify port availability.")
+                    self.finished.emit(False, [])
+                    return None
+
+            elif status == "FREE":
+                found_port = port
+                break
+
+            else: # BUSY
+                ilog.info(f"Port {port} is busy, trying next...")
+
+        return found_port
+
+
+    async def send(self, wscc, data: dict):
+        if wscc is None:
+            ilog.warning(f"Try to send a command while not connected to the backend")
+            return
+        try:
+            await wscc.send(json.dumps(data))
+        except Exception as e:
+            ilog.error(f"Send failed: {e}")
+
+
+    async def shutdown(self, wscc: ClientConnection):
+        """Handle graceful shutdown when the window is closed"""
+        self._is_shutting_down = True
+        ilog.info("Shutting down the backend...")
+
+        # Send a shutdown command to the backend (if needed)
+        if wscc:
+            print(yellow(f"{__class__.__name__} shutdown"))
+            try:
+                shutdown_command = {"cmd": "shutdown"}
+                await wscc.send(json.dumps(shutdown_command))
+                ilog.info("Shutdown command sent to server")
+
+            except Exception as e:
+                ilog.error(f"Failed to send shutdown command: {e}")
+
+        if self._backend_process and self._backend_process.poll() is None:
+            ilog.info("Terminating backend process...")
+            self._backend_process.terminate()
+
+        if self._backend_process is not None:
+            try:
+                self._backend_process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                ilog.warning("Backend didn't stop, killing...")
+                self._backend_process.kill()
+
+            # Stop the asyncio loop
+            ilog.info("Controller stopped")
+
+
+
 
     async def probe_port(self, port: int) -> str:
+        ilog.debug(f"probe port {port} for backend server")
         uri = f"ws://127.0.0.1:{port}"
         try:
-            async with connect(uri, open_timeout=0.5) as ws:
+            async with connect(uri) as wscc:
                 # Send identify command
-                await ws.send(json.dumps({"cmd": "identify"}))
+                await wscc.send(json.dumps({"cmd": "identify"}))
 
                 # Wait for response with timeout
                 try:
-                    msg = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                    msg = await asyncio.wait_for(wscc.recv(), timeout=1.0)
                     data = json.loads(msg)
                 except (asyncio.TimeoutError, json.JSONDecodeError):
                     # Not our server or unresponsive
@@ -223,7 +292,7 @@ class BackendInstallWorker(QThread):
 
                 # Check identity
                 if data.get("type") == "server_identity" and \
-                   data.get("payload", {}).get("name") == "herlegon install":
+                    data.get("payload", {}).get("name") == "herlegon install":
 
                     client_count = data["payload"].get("clients", 0)
                     ilog.info(f"Prob port {port}: Found herlegon install with {client_count} clients.")
@@ -231,11 +300,9 @@ class BackendInstallWorker(QThread):
                     if client_count <= 1:
                         # Only us connected (or 0?), treat as zombie
                         ilog.info(f"Only 1 client connected (probe). Treating as zombie. Sending stop...")
-                        await ws.send(json.dumps({"cmd": "stop"}))
-
-                        # Wait a bit for server to shutdown
-                        await asyncio.sleep(3.0)
+                        await self.shutdown(wscc=wscc)
                         return "KILLED"
+
                     else:
                         # Actual running instance
                         return "WS_SERVER"
@@ -244,9 +311,13 @@ class BackendInstallWorker(QThread):
 
         except (ConnectionRefusedError, OSError):
             return "FREE"
+
         except Exception as e:
-            ilog.debug(f"Probe port {port} error: {e}")
+            ilog.debug(f"Probe port {port}. exception: {str(e)}")
             return "BUSY"
+
+
+
 
     def stop(self):
         """Gracefully stop the worker and all subprocesses"""

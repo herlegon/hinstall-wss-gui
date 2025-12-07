@@ -406,6 +406,7 @@ class InstallerWindow(QMainWindow):
             ilog.error("Error during installation")
             # TODO: show error dialog
             self.next_button.setEnabled(False)
+
         else:
             # Track files installed by this page
             files = p.get_installed_files()
@@ -414,6 +415,9 @@ class InstallerWindow(QMainWindow):
 
             # Enable next button
             self.next_button.setEnabled(True)
+            if p.has_progress_bar():
+                self.slot_go_next()
+
 
 
     def slot_go_next(self):

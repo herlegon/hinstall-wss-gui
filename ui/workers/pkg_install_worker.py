@@ -41,6 +41,7 @@ class PkgInstallWorker(QThread):
 
             if installed:
                 self.progress.emit(100)
+                self.task_name.emit(f"All packages installed.")
                 self.finished.emit(True, [])
             else:
                 self.finished.emit(False, [])
