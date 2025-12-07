@@ -73,7 +73,7 @@ class WebSocketClient:
                 retries += 1
                 exception = str(e)
                 print(f"[ERROR] Connection error ({retries}): {e}")
-                if retries >= 3:
+                if retries >= 20:
                     self._running = False
                     self._state = CommandState.ERROR
                 self._ws = None

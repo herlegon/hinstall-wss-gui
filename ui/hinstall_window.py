@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 from hinstall import (
     parse_config_,
     ExtPackages,
+    ilog,
 )
 from hwidgets import (
     HComment,
@@ -402,14 +403,14 @@ class InstallerWindow(QMainWindow):
     def slot_task_completed(self, p: Type[Page], result: bool) -> None:
         """Handle task completion from a page."""
         if not result:
-            print("Error during installation")
+            ilog.error("Error during installation")
             # TODO: show error dialog
             self.next_button.setEnabled(False)
         else:
             # Track files installed by this page
             files = p.get_installed_files()
             self.all_installed_files.extend(files)
-            print(f"Page completed. Installed files: {files}")
+            ilog.debug(f"Page completed. Installed files: {files}")
 
             # Enable next button
             self.next_button.setEnabled(True)

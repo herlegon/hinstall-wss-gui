@@ -28,6 +28,7 @@ from hinstall import (
     ExtPackages,
     g_backend_dirs,
     download_install_ext_packages,
+    ilog,
 )
 from tests.local_rehost import get_rehost_dir
 
