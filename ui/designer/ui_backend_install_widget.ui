@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>987</width>
-    <height>231</height>
+    <width>227</width>
+    <height>205</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -51,10 +51,13 @@
    </item>
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_2">
+     <property name="topMargin">
+      <number>30</number>
+     </property>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
-        <widget class="QLabel" name="label">
+        <widget class="QLabel" name="indicator_step">
          <property name="text">
           <string>Downloading</string>
          </property>
@@ -74,7 +77,7 @@
         </spacer>
        </item>
        <item>
-        <widget class="QLabel" name="label_2">
+        <widget class="QLabel" name="indicator_progress">
          <property name="text">
           <string>100%</string>
          </property>

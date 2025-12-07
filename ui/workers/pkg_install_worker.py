@@ -1,28 +1,19 @@
+from __future__ import annotations
 import logging
 from PySide6.QtCore import QThread, Signal
-from hinstall import download_install_ext_packages, ExtPackages, ilog
-from hinstall.logger import STATUS
-from hinstall.install_worker import InstallWorker
-
-class WorkerLogHandler(logging.Handler):
-    def __init__(self, worker):
-        super().__init__()
-        self.worker: PackagesInstallWorker = worker
-        self.addFilter(lambda r: r.levelno == STATUS)
-
-    def format(self, record: logging.LogRecord) -> str:
-        return record.getMessage()
-
-    def emit(self, record):
-        msg = self.format(record)
-        self.worker.handle_log_message(msg)
+from hinstall import (
+    download_install_ext_packages,
+    ExtPackages,
+    ilog,
+)
+from .log_handler import WorkerLogHandler
 
 
-
-class PackagesInstallWorker(QThread):
+class PkgInstallWorker(QThread):
     progress = Signal(float)
     task_name = Signal(str)
     finished = Signal(bool, list)
+
 
     def __init__(self, packages: ExtPackages, reinstall: bool = True, threads: int = 1, use_local_host: bool = True):
         super().__init__()
@@ -32,6 +23,7 @@ class PackagesInstallWorker(QThread):
         self.use_local_host = use_local_host
         self.total_packages = len(packages) if packages else 0
         self.current_package = 0
+
 
     def run(self):
         # Create handler
@@ -63,8 +55,6 @@ class PackagesInstallWorker(QThread):
     def handle_log_message(self, msg: str):
         task_code = msg[1:3]
         payload = msg[4:]
-        # self.task_name.emit(msg)
-        # print(f"[{msg}] code={task_code}, msg={payload}")
 
         if task_code == "sd":
             # Start download...

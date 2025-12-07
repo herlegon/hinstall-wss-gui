@@ -122,7 +122,6 @@ class Page(QWidget, metaclass=QWidgetABCMeta):
     def reset_progress_bars(self) -> None:
         for child in self.findChildren(QWidget):
             if isinstance(child, HProgressBarType):
-                print(f"{__class__.__name__}: reset, force")
                 child.reset()
 
 

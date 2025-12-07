@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, Type
 from PySide6.QtCore import (
     Signal,
@@ -14,14 +15,21 @@ from hwidgets import (
     Theme,
 )
 from hytils import red
+from ..workers.backend_install_worker import BackendInstallWorker
 from ..designer.ui_backend_install_widget import Ui_BackendWidget
 from .page import Page
-from ..install_workers import InstallWorker
-
+from hinstall import (
+    parse_config_,
+    ExtPackages,
+    g_backend_dirs,
+    download_install_ext_packages,
+    get_python_version,
+    ilog,
+)
+from tests.local_rehost import get_rehost_dir
 
 
 class BackendInstallPage(Page, Ui_BackendWidget):
-    # signal_settings_modified = Signal()
 
     def __init__(
         self,
@@ -30,7 +38,6 @@ class BackendInstallPage(Page, Ui_BackendWidget):
     ):
         super().__init__(parent=parent, theme=theme)
         self.setupUi(self, theme=theme)
-
         self._step_label = f"Processing Server"
 
         self.subtitle.setWordWrap(True)
@@ -45,51 +52,61 @@ class BackendInstallPage(Page, Ui_BackendWidget):
 
         self.reset_widgets()
 
+        self.user_settings: dict[str, Any] = {}
+
 
     def update_settings(self, settings: dict[str, Any]) -> None:
-        print(red("todo"))
-
+        self.user_settings = settings
 
 
     def start_installation(self):
-        """Start the installation worker."""
-        steps = [
-            "Downloading backend server...",
-            "Installing dependencies...",
-            "Configuring server..."
-        ]
+        print("START BACKEND INSTALLATION")
 
-        # Create and start worker
-        self.worker = InstallWorker(steps)
-        self.worker.progress.connect(self._update_progress)
-        self.worker.status.connect(self.label.setText)
-        self.worker.finished_signal.connect(self._on_finished)
+        # # Create and start worker
+        self.worker: BackendInstallWorker = BackendInstallWorker(
+            user_settings=self.user_settings
+        )
+        # self.worker.progress.connect(self.slot_update_progress)
+        # self.worker.task_name.connect(self.indicator_step.setText)
+        # self.worker.finished.connect(self.slot_on_finished)
 
-        # Reset progress bar
-        self.progress_bar.setValue(0)
-        self.label_2.setText("0%")
-
-        # Start worker
+        # # Start worker
         self.worker.start()
 
 
-    def _update_progress(self, value: int):
+    def slot_update_progress(self, value: int):
         """Update progress bar and percentage label."""
+        duration: int = 0
+        if value == 100:
+            duration = self.progress_bar.getAnimationDuration()
+            self.progress_bar.setAnimationDuration(0)
+
         self.progress_bar.setValue(value)
-        self.label_2.setText(f"{value}%")
+        self.indicator_progress.setText(f"{value}%")
+
+        if duration:
+            self.progress_bar.setAnimationDuration(value)
 
 
-    def _on_finished(self, success: bool, files: list):
+    def slot_on_finished(self, success: bool, files: list[Path]):
         """Handle completion of installation."""
         self._installation_started = False
+
+        duration = self.progress_bar.getAnimationDuration()
+        self.progress_bar.setAnimationDuration(0)
+
         if success:
-            self.installed_files = files
-            self.label.setText("✓ Backend installed!")
-            self.label_2.setText("100%")
-            self.completed.emit(True)
+            self.progress_bar.setValue(100)
+            self.indicator_progress.setText("")
+
         else:
-            self.label.setText("✗ Installation failed")
-            self.completed.emit(False)
+            self.progress_bar.setValue(0)
+            self.indicator_progress.setText("❌")
+
+        self.progress_bar.setAnimationDuration(duration)
+
+        self.installed_files = files
+        self.completed.emit(success)
 
 
     def get_result(self) -> dict:

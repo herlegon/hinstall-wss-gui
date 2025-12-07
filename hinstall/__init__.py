@@ -1,6 +1,6 @@
 __version__ = "0.1.0"
 
-from .logger import ilog
+from .logger import ilog, STATUS_LEVEL
 
 from .backend_dirs import g_backend_dirs
 
@@ -50,4 +50,5 @@ __all__ = [
 
     "clean_invalid_distributions"
 
+    "STATUS_LEVEL",
 ]

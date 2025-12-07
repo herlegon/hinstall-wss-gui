@@ -1,3 +1,5 @@
+from __future__ import annotations
+from pathlib import Path
 from typing import Any, Type
 from PySide6.QtCore import (
     Signal,
@@ -16,11 +18,10 @@ from hwidgets import (
 from hytils import red
 from ..designer.ui_ai_resource_install_widget import Ui_AiResourceInstallWidget
 from .page import Page
-from ..install_workers import InstallWorker
+# from ..workers.pkg_install_worker import InstallWorker
 
 
 class AiResourceInstallPage(Page, Ui_AiResourceInstallWidget):
-    # signal_settings_modified = Signal()
 
     def __init__(
         self,
@@ -47,17 +48,53 @@ class AiResourceInstallPage(Page, Ui_AiResourceInstallWidget):
         ]
 
         # Create and start worker
-        self.worker = InstallWorker(steps)
-        self.worker.progress.connect(self._update_progress)
-        self.worker.status.connect(self.label.setText)
-        self.worker.finished_signal.connect(self._on_finished)
+        # self.worker = InstallWorker(steps)
+        # self.worker.progress.connect(self._update_progress)
+        # self.worker.status.connect(self.label.setText)
+        # self.worker.finished_signal.connect(self._on_finished)
 
         # Reset progress bar
         self.progress_bar.setValue(0)
         self.label_2.setText("0%")
 
         # Start worker
-        self.worker.start()
+        # self.worker.start()
+
+
+    def slot_update_progress(self, value: int):
+        """Update progress bar and percentage label."""
+        duration: int = 0
+        if value == 100:
+            duration = self.progress_bar.getAnimationDuration()
+            self.progress_bar.setAnimationDuration(0)
+
+        self.progress_bar.setValue(value)
+        self.indicator_progress.setText(f"{value}%")
+
+        if duration:
+            self.progress_bar.setAnimationDuration(value)
+
+
+    def slot_on_finished(self, success: bool, files: list[Path]):
+        """Handle completion of installation."""
+        self._installation_started = False
+
+        duration = self.progress_bar.getAnimationDuration()
+        self.progress_bar.setAnimationDuration(0)
+
+        if success:
+            self.progress_bar.setValue(100)
+            self.indicator_progress.setText("")
+
+        else:
+            self.progress_bar.setValue(0)
+            self.indicator_progress.setText("❌")
+
+        self.progress_bar.setAnimationDuration(duration)
+
+        self.installed_files = files
+        self.completed.emit(success)
+
 
 
     def _update_progress(self, value: int):

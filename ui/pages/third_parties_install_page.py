@@ -1,3 +1,4 @@
+from pathlib import Path
 from pprint import pprint
 import sys
 from typing import Any, Type
@@ -20,7 +21,7 @@ from hytils import lightgreen, red, yellow
 from ..designer.ui_third_party_install_widget import Ui_ThirdPartiesInstall
 from .page import Page
 from .ffmpeg_selection_page import FfmpegSelection
-from ..install_workers import InstallWorker, PackagesInstallWorker
+from ..workers.pkg_install_worker import PkgInstallWorker
 
 from hinstall import (
     parse_config_,
@@ -32,7 +33,6 @@ from tests.local_rehost import get_rehost_dir
 
 
 class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
-    # signal_settings_modified = Signal()
 
     def __init__(
         self,
@@ -64,11 +64,8 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
 
 
     def update_settings(self, settings: dict[str, Any]) -> None:
-        print(yellow(f"{self.objectName()}"))
-        pprint(settings)
         self.settings: dict = settings
         self.packages = None
-
 
         self.packages = self.settings.get('packages', None)
         if self.packages is None:
@@ -80,7 +77,6 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
 
 
     def start_installation(self):
-
         # No packages to install
         if self.packages is None or not self.packages:
             self.slot_on_finished(success=True, files=[])
@@ -89,9 +85,8 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
         # Set the local rehost
         g_backend_dirs.local_host = get_rehost_dir()
 
-
         # Create and start worker
-        self.worker: PackagesInstallWorker = PackagesInstallWorker(
+        self.worker: PkgInstallWorker = PkgInstallWorker(
             packages=self.packages,
             reinstall=True,
             threads=1,
@@ -103,7 +98,6 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
 
         # Start worker
         self.worker.start()
-
 
 
     def slot_update_progress(self, value: int):
@@ -120,22 +114,25 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
             self.progress_bar.setAnimationDuration(value)
 
 
-    def slot_on_finished(self, success: bool, files: list):
+    def slot_on_finished(self, success: bool, files: list[Path]):
         """Handle completion of installation."""
         self._installation_started = False
 
         duration = self.progress_bar.getAnimationDuration()
         self.progress_bar.setAnimationDuration(0)
-        self.progress_bar.setValue(100)
-        self.progress_bar.setAnimationDuration(duration)
 
         if success:
-            self.indicator_progress.setText("✅")
-            self.installed_files = files
-            self.completed.emit(True)
+            self.progress_bar.setValue(100)
+            self.indicator_progress.setText("")
+
         else:
+            self.progress_bar.setValue(0)
             self.indicator_progress.setText("❌")
-            self.completed.emit(False)
+
+        self.progress_bar.setAnimationDuration(duration)
+
+        self.installed_files = files
+        self.completed.emit(success)
 
 
     def get_result(self) -> dict:

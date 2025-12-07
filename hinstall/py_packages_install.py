@@ -61,12 +61,12 @@ def _generate_backend_env(
         forbidden_names.extend(exclude_append)
 
     python_dir: Path = g_backend_dirs.python_exe.parent
-    if sys.platform == 'linux':
+    if sys.platform == "win32":
+        sep: str = ";"
+
+    else:
         python_dir = python_dir.parent
         sep: str = ":"
-
-    elif sys.platform == "win32":
-        sep: str = ";"
 
     # Clean the environment
     backend_env = os.environ.copy()
@@ -229,7 +229,6 @@ def clean_invalid_distributions():
             text=True
         )
     except Exception as e:
-        ilog.warning()
         return
 
     installed_packages = result.stdout

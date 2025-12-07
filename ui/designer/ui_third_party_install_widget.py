@@ -66,7 +66,7 @@ class Ui_ThirdPartiesInstall(object):
     def setupUi(self, ThirdPartiesInstall, theme: Type[Theme]):
         if not ThirdPartiesInstall.objectName():
             ThirdPartiesInstall.setObjectName(u"ThirdPartiesInstall")
-        ThirdPartiesInstall.resize(528, 219)
+        ThirdPartiesInstall.resize(288, 228)
         self.main_layout = QVBoxLayout(ThirdPartiesInstall)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -83,10 +83,7 @@ class Ui_ThirdPartiesInstall(object):
 
         self.verticalLayout_2 = QVBoxLayout()
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.verticalSpacer_2 = QSpacerItem(511, 37, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-
-        self.verticalLayout_2.addItem(self.verticalSpacer_2)
-
+        self.verticalLayout_2.setContentsMargins(-1, 40, -1, -1)
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.indicator_step = HLabel(ThirdPartiesInstall, theme=theme)

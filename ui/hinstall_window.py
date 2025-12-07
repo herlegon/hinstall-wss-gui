@@ -103,12 +103,12 @@ class InstallerWindow(QMainWindow):
             self.pages.insert(1, FFmpegSelectionPage(self, theme=theme))
 
         self.settings: dict[str, Any] = {
+            'devmode': self.dev,
             'packages': xtal_pkgs,
         }
 
-
         self.setWindowTitle("First time installer")
-        self.setFixedWidth(1100)
+        self.setFixedWidth(1200)
         content_hpadding: int= 64
         content_vpadding: int = 16
         for p in self.pages:
@@ -262,7 +262,10 @@ class InstallerWindow(QMainWindow):
         # Setup logging
         self.log_handler = QtLogHandler()
         self.log_handler.signaller.new_record.connect(self.slot_append_log)
-        setup_alog(to_stdout=True, to_gui=self.log_handler)
+        setup_alog(
+            to_stdout=self.dev,
+            to_gui=self.log_handler
+        )
 
         # Window layout
         main_layout.addWidget(self.title_bar)
@@ -276,7 +279,9 @@ class InstallerWindow(QMainWindow):
 
 
         # Initial
-        self.current_index: int = 0
+        self.current_index: int = 3
+        if not self.dev:
+            self.current_index = 0
         self.step_indicator.setCurrentStep(self.current_index)
         self.stack.setCurrentIndex(self.current_index)
 
@@ -291,18 +296,6 @@ class InstallerWindow(QMainWindow):
 
         # Track all installed files across all pages
         self.all_installed_files: list[str] = []
-        # self.page2.install_complete.connect(lambda: self.next_button.setEnabled(True))
-        # self.page3.install_complete.connect(self._go_next)
-        # self.page4.install_complete.connect(lambda: self.next_button.setEnabled(True))
-        # self.page5.install_complete.connect(self._on_complete)
-
-        # self.log_btn.clicked.connect(self._toggle_log)
-        # self.log_layout.addWidget(self.log_btn)
-        # self.page5.log_message.connect(self._append_log)
-
-
-        # # Start
-        # QTimer.singleShot(500, self.page1.start_installation)
 
 
         # Ensure the first page's showEvent is triggered after window is fully set up
@@ -312,23 +305,11 @@ class InstallerWindow(QMainWindow):
         self.stack.currentWidget().show()
 
         self.setFixedSize(self.sizeHint())
+        self.setFixedWidth(950)
         self.center_on_screen()
 
-        self.log_viewer.appendPlainText("""The issue was that
-HLogViewer
- (which inherits from
-HPlainTextEdit
-) was displaying an I-beam cursor (text selection cursor) even though it was in read-only mode. While
-HPlainTextEdit
- correctly set the widget's cursor to ArrowCursor when read-only, it failed to update the viewport's cursor, which defaults to IBeamCursor in QPlainTextEdit. This caused the cursor to turn into an 'I' when hovering over the log viewer area, which appears directly below the log button when toggled.
-
-I fixed this by updating HPlainTextEdit.setReadOnly in
-a:\\hwidgets\\hwidgets\\plain_text_edit.py
- to explicitly set the viewport's cursor to ArrowCursor when read-only is enabled.
-
-I verified the fix using a reproduction script that checked the cursor shape of both the button and the log viewer's viewport.""")
-
-
+        if self.dev:
+            self.slot_toggle_log(True)
 
 
     def center_on_screen(self):
@@ -400,7 +381,6 @@ I verified the fix using a reproduction script that checked the cursor shape of 
         self.center_on_screen()
 
 
-
     def _update_stack_sizing(self, index=None):
         for i in range(self.stack.count()):
             widget = self.stack.widget(i)
@@ -442,6 +422,7 @@ I verified the fix using a reproduction script that checked the cursor shape of 
         page: Type[Page] = self.stack.currentWidget()
         results = page.get_result()
         self.settings.update(results)
+        self.user_settings.update(self.settings)
 
         # End of installation
         if current >= self.stack.count() - 1:

@@ -111,14 +111,17 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
     def get_selection(self) -> FfmpegSelection:
         if self.radio_button_user.isChecked():
             return 'user'
+
         if self.radio_button_third_party.isChecked():
             return 'gpl'
+
         return 'lgpl'
 
 
-    def get_user_settings(self) -> dict:
+    def get_result(self) -> dict:
         return {
             'ffmpeg_selection': self.get_selection(),
+            'ffmpeg_user_dir': self.line_edit_ffmpeg_dir.text(),
         }
 
 
@@ -126,12 +129,15 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
         ffmpeg_selection: FfmpegSelection = settings.get('ffmpeg_selection', 'lgpl')
         if ffmpeg_selection == 'gpl':
             self.radio_button_third_party.setChecked(True)
+
         elif ffmpeg_selection == 'user':
             self.radio_button_user.setChecked(True)
+
         else:
             # minimal (lgpl)
             self.radio_button_minimal.setChecked(True)
 
+        self.line_edit_ffmpeg_dir.setText(settings.get('ffmpeg_user_dir', ""))
 
 
     def invalidate_all_layouts(self):
@@ -152,8 +158,5 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
 
 
 
-
-    def get_result(self) -> dict:
-        return self.get_user_settings()
 
 

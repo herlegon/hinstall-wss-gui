@@ -1,3 +1,4 @@
+from pprint import pprint
 from typing import Any, Type
 from PySide6.QtCore import (
     Signal,
@@ -44,6 +45,7 @@ class WelcomePage(Page, Ui_WelcomeWidget):
         # USe a common directory for all Herlegon software
         self.checkbox_use_as_global.setChecked(True)
         self.checkbox_use_as_global.setEnabled(False)
+        self.checkbox_use_as_global.setVisible(False)
 
         # custom dir not yet available
         self.checkbox_custom_dir.setChecked(False)
@@ -54,7 +56,7 @@ class WelcomePage(Page, Ui_WelcomeWidget):
 
 
     def update_settings(self, settings: dict[str, Any]) -> None:
-        b = settings.get('do_cache', None)
+        b = settings.get('cache', None)
         if b is not None:
             self.checkbox_cache.setChecked(b)
 
@@ -62,21 +64,21 @@ class WelcomePage(Page, Ui_WelcomeWidget):
         if b is not None:
             self.checkbox_use_as_global.setChecked(b)
 
-        b = settings.get('use_custom_dir', None)
+        b = settings.get('custom_install_dir', None)
         if b is not None:
             self.checkbox_custom_dir.setChecked(b)
 
-        s = settings.get('use_custom_dir', None)
+        s = settings.get('install_dir', None)
         if s is not None:
             self.lineedit_custom_dir.setText(s)
 
 
     def get_result(self) -> dict:
         return {
-            'do_cache': self.checkbox_cache.isChecked(),
+            'cache': self.checkbox_cache.isChecked(),
+            'custom_install_dir': self.checkbox_custom_dir.isChecked(),
+            'install_dir': self.lineedit_custom_dir.text(),
             'use_as_global': self.checkbox_use_as_global.isChecked(),
-            'use_custom_dir': self.checkbox_custom_dir.isChecked(),
-            'custom_install_dir': self.lineedit_custom_dir.text()
         }
 
 

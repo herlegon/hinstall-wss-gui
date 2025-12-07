@@ -5,15 +5,15 @@ from typing import Optional
 from hytils import darkgrey, green, yellow, red
 
 
-STATUS = 15
-logging.addLevelName(STATUS, "STATUS")
+STATUS_LEVEL = 15
+logging.addLevelName(STATUS_LEVEL, "STATUS")
 
 
 class ColorFormatter(logging.Formatter):
     COLORS = {
         logging.DEBUG: darkgrey,
         logging.INFO: green,
-        STATUS: lambda x: x,
+        STATUS_LEVEL: lambda x: x,
         logging.WARNING: yellow,
         logging.ERROR: red,
         logging.CRITICAL: red,
@@ -23,7 +23,7 @@ class ColorFormatter(logging.Formatter):
         logging.DEBUG: "[D]",
         5: "[V]",
         logging.INFO: "[I]",
-        STATUS: "",
+        STATUS_LEVEL: "",
         logging.WARNING: "[W]",
         logging.ERROR: "[E]",
         logging.CRITICAL: "[C]",
@@ -31,7 +31,7 @@ class ColorFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         level_no: int = record.levelno
-        if level_no == STATUS:
+        if level_no == STATUS_LEVEL:
             return record.getMessage()
 
         color_fn = self.COLORS.get(level_no, lambda x: x)
@@ -54,8 +54,8 @@ class ColorFormatter(logging.Formatter):
 
 class HInstallLogger(logging.Logger):
     def status(self, msg, *args, **kwargs):
-        if self.isEnabledFor(STATUS):
-            self._log(STATUS, msg, args, **kwargs)
+        if self.isEnabledFor(STATUS_LEVEL):
+            self._log(STATUS_LEVEL, msg, args, **kwargs)
 
 
 logging.setLoggerClass(HInstallLogger)
@@ -78,6 +78,7 @@ def setup_alog(
     if to_stdout:
         stream_handler = logging.StreamHandler(sys.stdout)
         stream_handler.setFormatter(stdout_formatter or ColorFormatter())
+        stream_handler.addFilter(lambda r: r.levelno != STATUS_LEVEL)
         logger.addHandler(stream_handler)
 
     # # File handler
@@ -89,6 +90,7 @@ def setup_alog(
     # GUI handler
     if to_gui:
         to_gui.setFormatter(gui_formatter or logging.Formatter('%(message)s'))
+        to_gui.addFilter(lambda r: r.levelno != STATUS_LEVEL)
         logger.addHandler(to_gui)
 
     return logger
