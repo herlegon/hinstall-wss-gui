@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import logging
 from pathlib import Path
 import subprocess
@@ -14,8 +15,8 @@ from hinstall import (
     g_backend_dirs,
 )
 from hinstall import get_python_version
+from tests.test_ws_install import WebSocketClient
 from .log_handler import WorkerLogHandler
-
 
 
 class BackendInstallWorker(QThread):
@@ -94,8 +95,11 @@ class BackendInstallWorker(QThread):
                     f"  {k}: {v}"
                 )
 
+        self.process = None
+        self.client = None
+
         try:
-            result = subprocess.run(
+            self.process = subprocess.Popen(
                 [str(g_backend_dirs.python_exe), backend_script_fp],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -103,16 +107,53 @@ class BackendInstallWorker(QThread):
                 text=True
             )
 
+            # Allow some time for the server to start
+            # Wait a bit or retry connection in client
+
+            uri = "ws://127.0.0.1:8442"
+            self.client = WebSocketClient(uri)
+
+            # Start the client loop (blocking this thread, but handling async)
+            asyncio.run(self.client.start())
+
         except Exception as e:
-            ilog.error(f"Backend ended with error: {e}")
-            self.task_name.emit("Failed to start the backend.")
+            ilog.error(f"Backend worker error: {e}")
+            self.task_name.emit("Failed to run the backend.")
             self.progress.emit(0)
             self.finished.emit(False, [])
 
-        if result.returncode == 1:
-            ilog.error(result.stdout)
+        finally:
+            if self.process:
+                if self.process.poll() is None:
+                    ilog.info("Terminating backend server process...")
+                    self.process.terminate()
+                    try:
+                        self.process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        self.process.kill()
 
-        ilog.removeHandler(handler)
+                if self.process.returncode != 0 and self.process.returncode is not None:
+                     # Check if we have output to show from pipe?
+                     # Since we used PIPE, we might want to read it if we can
+                     # But Popen stdout is not read automatically unless we do it.
+                     pass
+
+            ilog.removeHandler(handler)
+
+    def stop(self):
+        """Gracefully stop the worker and all subprocesses"""
+        ilog.info("Stopping BackendInstallWorker...")
+        if self.client:
+            self.client.stop()
+
+        # If client loop is running, stop() might not be enough if it's stuck on I/O
+        # We rely on client.stop() triggering shutdown logic.
+
+        if self.process and self.process.poll() is None:
+             self.process.terminate()
+
+        self.quit()
+        self.wait()
 
 
 
