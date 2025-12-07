@@ -76,6 +76,12 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
             self.packages = self.packages.get_all_except('ffmpeg')
 
 
+    def get_result(self) -> dict:
+        return {
+            'installed_files': self.installed_files
+        }
+
+
     def start_installation(self):
         # No packages to install
         if self.packages is None or not self.packages:
@@ -133,11 +139,5 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
 
         self.installed_files = files
         self.completed.emit(success)
-
-
-    def get_result(self) -> dict:
-        return {
-            'installed_files': self.installed_files
-        }
 
 

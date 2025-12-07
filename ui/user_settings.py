@@ -44,6 +44,11 @@ class UserSettings:
             warn(f"Warning: could not read {self.settings_fp}: {e}")
 
 
+    @property
+    def settings(self) -> dict[str, Any]:
+        return self._settings
+
+
     def _platform_config_dir(self) -> Path:
         """
         - Windows: %APPDATA%/{org_name}/{app_name}/settings.toml
@@ -100,9 +105,4 @@ class UserSettings:
             self.settings_fp.write_text("\n".join(lines), encoding="utf-8")
         except Exception as e:
             print(f"Warning: could not write {self.settings_fp}: {e}")
-
-
-    @property
-    def settings(self) -> dict[str, Any]:
-        return self._settings
 

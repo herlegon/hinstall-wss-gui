@@ -47,6 +47,7 @@ from hwidgets import (
 )
 from PySide6.QtWidgets import QDialog, QLabel
 
+from .user_settings import UserSettings
 from .title_bar import TitleBar
 
 from .pages.page import Page
@@ -102,10 +103,12 @@ class InstallerWindow(QMainWindow):
         if xtal_pkgs.get_by_key('ffmpeg') is not None:
             self.pages.insert(1, FFmpegSelectionPage(self, theme=theme))
 
+        self.user_settings = UserSettings().settings
         self.settings: dict[str, Any] = {
             'devmode': self.dev,
             'packages': xtal_pkgs,
         }
+        self.settings.update(self.user_settings)
 
         self.setWindowTitle("First time installer")
         self.setFixedWidth(1200)
@@ -277,18 +280,18 @@ class InstallerWindow(QMainWindow):
         main_layout.addWidget(HHorizontalDivider(parent=self, theme=theme))
         main_layout.addWidget(navigation_widget)
 
-
         # Initial
         self.current_index: int = 3
         if not self.dev:
             self.current_index = 0
         self.step_indicator.setCurrentStep(self.current_index)
         self.stack.setCurrentIndex(self.current_index)
+        current_page: type[Page] = self.stack.currentWidget()
+        current_page.update_settings(self.user_settings)
 
         # Adjust window size to fit content
         # self._update_stack_sizing()
         self.adjustSize()
-
 
         # Signals
         for p in self.pages:
@@ -296,7 +299,6 @@ class InstallerWindow(QMainWindow):
 
         # Track all installed files across all pages
         self.all_installed_files: list[str] = []
-
 
         # Ensure the first page's showEvent is triggered after window is fully set up
         # Use a timer to ensure all initialization is complete
@@ -418,7 +420,7 @@ class InstallerWindow(QMainWindow):
         print("next")
         current = self.stack.currentIndex()
 
-        #  Update settings
+        #  Update settings and save
         page: Type[Page] = self.stack.currentWidget()
         results = page.get_result()
         self.settings.update(results)
@@ -434,7 +436,6 @@ class InstallerWindow(QMainWindow):
         current += 1
         next_page: Type[Page] = self.stack.widget(current)
         next_page.update_settings(self.settings)
-
 
         self.stack.setCurrentIndex(current)
         self.cancel_button.setEnabled(True)
@@ -479,13 +480,13 @@ class InstallerWindow(QMainWindow):
 
             # Check if new page has progress bar
             current_page = self.pages[current]
+            current_page.update_settings(self.settings)
             if current_page.has_progress_bar():
                 # Disable next button until installation completes
                 self.next_button.setEnabled(False)
             else:
                 # No progress bar, next button stays enabled
                 self.next_button.setEnabled(True)
-
 
 
     def slot_cancel(self):
