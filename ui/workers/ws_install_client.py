@@ -43,69 +43,17 @@ class CommandState(Enum):
     ERROR = 'error'
 
 
-
-RequestType = Literal[
-    'heartbeat',
-    'identify',
-    'restart',
-    'shutdown',
-    'telemetry',
-
-    # applications:
-    'setup',
-    'convert',
-    # ...
-]
-
-
-ResponseType = Literal[
-    'pong',
-    'identity',
-    'setup',
-]
-
-
-EventType = Literal[
-    'msg',
-    'telemetry',
-    'status',
-]
-
-
-SetupTaskId = Literal[
-    'parse',
-    'install',
-]
-
-
-
-@dataclass(slots=True)
-class RequestMessage:
-    type: RequestType
-    payload: dict | None = None
-
-
-
-@dataclass(slots=True)
-class ResponseMessage:
-    type: ResponseType
-    payload: dict | None = None
-
-
-
-@dataclass(slots=True)
-class EventMessage:
-    type: EventType
-    payload: dict | None = None
-
-
-
-def serialize(msg: RequestMessage) -> str:
-    return json.dumps(asdict(msg))
-
-
-def deserialize(msg: ResponseMessage | EventMessage) -> dict:
-    return json.loads(msg)
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent / "hwss"))
+from api import (
+    RequestMessage,
+    deserialize,
+    serialize,
+    ResponseMessage,
+    EventMessage,
+    EventType,
+    ResponseType,
+    WssIdentity,
+)
 
 
 class WsInstallClient:
@@ -125,7 +73,7 @@ class WsInstallClient:
         self.stages: list[int] = (
             stages if isinstance(stages, list | tuple) else [stages,]
         )
-        self._ws: Optional[ClientConnection] = None
+        self.ws_cc: Optional[ClientConnection] = None
         self._running = False
         self._last_pong = None
         self._state = CommandState.IDLE
@@ -150,15 +98,12 @@ class WsInstallClient:
                     ping_timeout=1.5,
                 ) as ws:
                     retries = 0
-                    self._ws = ws
+                    self.ws_cc = ws
                     ilog.info("[INFO] Connected to backend")
                     self._state = CommandState.IDLE
 
-                    # Update pong timestamp when we receive a pong
-                    ws.pong_handler = lambda _: setattr(self, "_last_pong", time.time())
-
                     await asyncio.gather(
-                        self._reception_loop(),
+                        self._reception_task(),
                         self._heartbeat_loop(),
                         self.state_machine(),
                     )
@@ -174,16 +119,16 @@ class WsInstallClient:
                 if retries >= 3:
                     self._running = False
                     self._state = CommandState.ERROR
-                self._ws = None
+                self.ws_cc = None
                 await asyncio.sleep(delay)
 
             finally:
-                self._ws = None
+                self.ws_cc = None
                 if self._running:
                     await asyncio.sleep(delay)
 
         self._running = False
-        self._ws = None
+        self.ws_cc = None
         msg = f" with error: {exception}" if exception else ""
         ilog.info(f"[INFO] Connection loop terminated{msg}")
 
@@ -201,8 +146,8 @@ class WsInstallClient:
         if self._loop and self._loop.is_running():
             # Try to close websocket to unblock recv loop
             async def close_ws():
-                if self._ws:
-                    await self._ws.close()
+                if self.ws_cc:
+                    await self.ws_cc.close()
 
             asyncio.run_coroutine_threadsafe(close_ws(), self._loop)
 
@@ -211,12 +156,11 @@ class WsInstallClient:
         ilog.debug(f"Message received: {msg}")
 
 
-
-    async def _reception_loop(self):
+    async def _reception_task(self):
         """Receive messages from server"""
         try:
-            while self._running and self._ws:
-                msg = await self._ws.recv()
+            while self._running and self.ws_cc:
+                msg = await self.ws_cc.recv()
                 data: dict = deserialize(msg)
 
                 # For debug
@@ -255,9 +199,11 @@ class WsInstallClient:
         if event.type == "msg":
             # Handle message event
             pass
+
         elif event.type == "telemetry":
             # Handle telemetry event
             pass
+
         elif event.type == "status":
             # Handle status event
             pass
@@ -273,7 +219,6 @@ class WsInstallClient:
         if response.type != 'install':
             return
 
-
         task_result = response.payload
         print(task_result)
 
@@ -285,7 +230,7 @@ class WsInstallClient:
     async def state_machine(self):
         """State machine that sends commands in sequence"""
         self.event = ''
-        while self._running and self._ws:
+        while self._running and self.ws_cc:
 
             try:
                 if self._state == CommandState.IDLE:
@@ -388,7 +333,7 @@ class WsInstallClient:
 
     async def _send_message(self, message: RequestMessage | str):
         """Send command to server"""
-        if not self._ws:
+        if not self.ws_cc:
             ilog.warning("[WARNING] Attempted to send while not connected")
             return
 
@@ -398,7 +343,7 @@ class WsInstallClient:
                 if not isinstance(message, str)
                 else message
             )
-            await self._ws.send(msg)
+            await self.ws_cc.send(msg)
             ilog.info(f"[SEND] {msg}")
 
         except Exception as e:
@@ -429,7 +374,7 @@ class WsInstallClient:
         while running a long task
         """
         heartbeat_msg = serialize(RequestMessage(type='heartbeat'))
-        while self._running and self._ws:
+        while self._running and self.ws_cc:
             try:
                 await self._send_message(heartbeat_msg)
 

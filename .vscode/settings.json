@@ -24,6 +24,7 @@
         "../hytils",
         "../hwidgets",
         "../hsys",
+        "../hwss",
     ],
     "python.analysis.typeCheckingMode": "basic",
     "python.analysis.diagnosticSeverityOverrides": {

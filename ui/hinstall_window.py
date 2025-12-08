@@ -550,7 +550,7 @@ class InstallerWindow(QMainWindow):
         dialog_layout.addWidget(file_count_label)
 
         # Create cleanup worker
-        cleanup_worker = CleanupWorker(self.all_installed_files)
+        # cleanup_worker = CleanupWorker(self.all_installed_files)
 
         # Connect signals
         def update_progress(value):
@@ -558,12 +558,12 @@ class InstallerWindow(QMainWindow):
             removed = int(value * len(self.all_installed_files) / 100)
             file_count_label.setText(f"{removed} / {len(self.all_installed_files)} files removed")
 
-        cleanup_worker.progress.connect(update_progress)
-        cleanup_worker.status.connect(status_label.setText)
-        cleanup_worker.finished_signal.connect(lambda success: self._on_cleanup_finished(cleanup_dialog, success))
+        # cleanup_worker.progress.connect(update_progress)
+        # cleanup_worker.status.connect(status_label.setText)
+        # cleanup_worker.finished_signal.connect(lambda success: self._on_cleanup_finished(cleanup_dialog, success))
 
-        # Start cleanup
-        cleanup_worker.start()
+        # # Start cleanup
+        # cleanup_worker.start()
 
         # Show dialog
         cleanup_dialog.exec()

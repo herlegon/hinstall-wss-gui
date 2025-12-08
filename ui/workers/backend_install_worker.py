@@ -23,7 +23,9 @@ from hinstall import (
     ilog,
 )
 from hytils import yellow
-from .ws_install_client import WsInstallClient, serialize
+from .ws_install_client import (
+    RequestMessage, ResponseMessage, WsInstallClient, deserialize, serialize, WssIdentity
+)
 from .log_handler import WorkerLogHandler
 from websockets import (
     connect,
@@ -277,29 +279,29 @@ class BackendInstallWorker(QThread):
             async with connect(uri) as wscc:
 
                 # Request server identity
-                await wscc.send(serialize(request='identify'))
+                await wscc.send(serialize(RequestMessage('identify')))
 
                 # Wait for response with timeout
                 try:
                     msg = await asyncio.wait_for(wscc.recv(), timeout=1.0)
-                    data = json.loads(msg)
+                    data = deserialize(msg)
 
                 except (asyncio.TimeoutError, json.JSONDecodeError):
                     # Not our server or unresponsive
                     return 'busy'
 
                 # Check identity to stop it if a zombie
-                if data.get("response") == "identity":
-                    payload = json.loads(data.get("payload", ""))
+                if data.get("type") == 'identity':
+                    response = ResponseMessage(**data)
+                    identity = WssIdentity(**response.payload)
                     if (
-                        payload.get("organization", "") == 'herlegon'
-                        and payload.get("app", "") == 'install'
+                        identity.organization == 'herlegon'
+                        and identity.app == 'hinstall'
                     ):
                         # Already a websocket serve running
-                        client_count = payload.get("clients", 0)
-                        ilog.info(f"Found herlegon installation with {client_count} clients.")
+                        ilog.info(f"Found herlegon installation with {identity.clients} clients.")
 
-                        if client_count <= 1:
+                        if identity.clients <= 1:
                             # Only us connected (or 0?), treat as zombie
                             ilog.info(f"Only 1 client connected (probe). Treating as zombie. Trying to stop it...")
                             await self.shutdown(wscc=wscc)
