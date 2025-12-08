@@ -146,7 +146,8 @@ class InstallerWindow(QMainWindow):
 
         main_layout = QVBoxLayout(container)
         main_layout.setSpacing(0)
-        main_layout.setContentsMargins(1, 1, 1, 1)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        # main_layout.setContentsMargins(1, 1, 1, 1)
 
         # Title bar
         self.title_bar = TitleBar(

@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -22,7 +23,7 @@ from hinstall import (
     ilog,
 )
 from hytils import yellow
-from tests.test_ws_install import WebSocketClient
+from .ws_install_client import WsInstallClient
 from .log_handler import WorkerLogHandler
 from websockets import (
     connect,
@@ -73,7 +74,7 @@ class BackendInstallWorker(QThread):
                 repo_dirs: list[str] = ["A:\\", "D:\\", "E:\\"]
             else:
                 repo_dirs: list[str] = [
-                    os.environ.get('XDG_DATA_HOME', Path.home(), "github"),
+                    os.environ.get('XDG_DATA_HOME', Path.home() / "github"),
                     os.environ.get('XDG_DATA_HOME', Path.home()),
                 ]
             for dir in repo_dirs:
@@ -110,8 +111,11 @@ class BackendInstallWorker(QThread):
                     f"  {k}: {v}"
                 )
 
+        # Server IP
+        server_ip = self.user_settings.get('server_ip', "127.0.0.1")
+
         # Port detection
-        found_port = self.get_free_port()
+        found_port = self.get_free_port(server_ip)
         if found_port is None:
             ilog.removeHandler(handler)
             ilog.critical(f"Another installation is on going or port is used by another process.")
@@ -141,9 +145,6 @@ class BackendInstallWorker(QThread):
                 start_new_session=False,  # keeps it tied to parent process group
             )
 
-            uri = f"ws://127.0.0.1:{found_port}"
-            self.client = WebSocketClient(uri)
-
             # Wait until backend prints "READY"
             for line in iter(self._backend_process.stdout.readline, ""):
                 sys.stdout.write(line)
@@ -152,9 +153,6 @@ class BackendInstallWorker(QThread):
                     ilog.info("The backend server is ready to work")
                     self._last_pong = time.time()
                     self._is_server_ready = True
-                      # Signal that server is ready
-                    # self._server_ready_event.set()
-                    ilog.info("Backend is ready")
                     break
 
             # Forward stdout
@@ -163,20 +161,22 @@ class BackendInstallWorker(QThread):
                     target.write(line)
                     target.flush()
                     line = line.rstrip()
-                    # print(line)
-                    # try:
-                    #     self.signal_log.emit(line)
-                    # except:
-                    #     pass
                 stream.close()
 
             threads = [
                 threading.Thread(target=forward, args=(self._backend_process.stdout, sys.stdout)),
                 threading.Thread(target=forward, args=(self._backend_process.stderr, sys.stderr)),
             ]
-            ilog.info(f"Start the backend server")
+            ilog.info(f"Backend server is running")
             for t in threads:
                 t.start()
+
+            # Start the client
+            uri = f"ws://{server_ip}:{found_port}"
+            self.client = WsInstallClient(uri)
+            self.client.start()
+
+            # wait for the end
             for t in threads:
                 t.join()
 
@@ -186,16 +186,18 @@ class BackendInstallWorker(QThread):
         finally:
             self._backend_process = None
 
+
+        ilog.info("Finished the installation of the backend server")
         ilog.removeHandler(handler)
 
 
-    def get_free_port(self) -> int| None:
+    def get_free_port(self, server_ip: str) -> int| None:
         found_port = None
 
         # Check ports
         for port in range(49990, 49991):
             # Probing
-            status = asyncio.run(self.probe_port(port))
+            status = asyncio.run(self.probe_port(server_ip, port))
 
             if status == "WS_SERVER":
                 ilog.info(f"Found existing backend server on port {port}.")
@@ -231,6 +233,50 @@ class BackendInstallWorker(QThread):
         return found_port
 
 
+
+    async def probe_port(self, server_ip: str, port: int) -> str:
+        ilog.debug(f"probe port {port} for backend server")
+        uri = f"ws://{server_ip}:{port}"
+        try:
+            async with connect(uri) as wscc:
+                # Send identify command
+                await wscc.send(json.dumps({"cmd": "identify"}))
+
+                # Wait for response with timeout
+                try:
+                    msg = await asyncio.wait_for(wscc.recv(), timeout=1.0)
+                    data = json.loads(msg)
+                except (asyncio.TimeoutError, json.JSONDecodeError):
+                    # Not our server or unresponsive
+                    return "BUSY"
+
+                # Check identity
+                if data.get("type") == "server_identity" and \
+                    data.get("payload", {}).get("name") == "herlegon install":
+
+                    client_count = data["payload"].get("clients", 0)
+                    ilog.info(f"Probe port {port}: Found herlegon install with {client_count} clients.")
+
+                    if client_count <= 1:
+                        # Only us connected (or 0?), treat as zombie
+                        ilog.info(f"Only 1 client connected (probe). Treating as zombie. Sending stop...")
+                        await self.shutdown(wscc=wscc)
+                        return "KILLED"
+
+                    else:
+                        # Actual running instance
+                        return "WS_SERVER"
+
+                return "BUSY"
+
+        except (ConnectionRefusedError, OSError):
+            return "FREE"
+
+        except Exception as e:
+            ilog.debug(f"Probe port {port}. exception: {str(e)}")
+            return "BUSY"
+
+
     async def send(self, wscc, data: dict):
         if wscc is None:
             ilog.warning(f"Try to send a command while not connected to the backend")
@@ -242,7 +288,8 @@ class BackendInstallWorker(QThread):
 
 
     async def shutdown(self, wscc: ClientConnection):
-        """Handle graceful shutdown when the window is closed"""
+        """Handle graceful shutdown when the window is closed
+        """
         self._is_shutting_down = True
         ilog.info("Shutting down the backend...")
 
@@ -270,52 +317,6 @@ class BackendInstallWorker(QThread):
 
             # Stop the asyncio loop
             ilog.info("Controller stopped")
-
-
-
-
-    async def probe_port(self, port: int) -> str:
-        ilog.debug(f"probe port {port} for backend server")
-        uri = f"ws://127.0.0.1:{port}"
-        try:
-            async with connect(uri) as wscc:
-                # Send identify command
-                await wscc.send(json.dumps({"cmd": "identify"}))
-
-                # Wait for response with timeout
-                try:
-                    msg = await asyncio.wait_for(wscc.recv(), timeout=1.0)
-                    data = json.loads(msg)
-                except (asyncio.TimeoutError, json.JSONDecodeError):
-                    # Not our server or unresponsive
-                    return "BUSY"
-
-                # Check identity
-                if data.get("type") == "server_identity" and \
-                    data.get("payload", {}).get("name") == "herlegon install":
-
-                    client_count = data["payload"].get("clients", 0)
-                    ilog.info(f"Prob port {port}: Found herlegon install with {client_count} clients.")
-
-                    if client_count <= 1:
-                        # Only us connected (or 0?), treat as zombie
-                        ilog.info(f"Only 1 client connected (probe). Treating as zombie. Sending stop...")
-                        await self.shutdown(wscc=wscc)
-                        return "KILLED"
-
-                    else:
-                        # Actual running instance
-                        return "WS_SERVER"
-
-                return "BUSY"
-
-        except (ConnectionRefusedError, OSError):
-            return "FREE"
-
-        except Exception as e:
-            ilog.debug(f"Probe port {port}. exception: {str(e)}")
-            return "BUSY"
-
 
 
 

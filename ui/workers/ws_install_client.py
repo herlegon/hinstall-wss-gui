@@ -38,7 +38,8 @@ class CommandState(Enum):
     ERROR = "error"
 
 
-class WebSocketClient:
+
+class WsInstallClient:
     def __init__(self, uri: str, on_message: Optional[Callable] = None):
         self._uri = uri
         self._ws: Optional[ClientConnection] = None
@@ -114,12 +115,12 @@ class WebSocketClient:
         """Stop the WebSocket client"""
         self._running = False
         if self._loop and self._loop.is_running():
-             # Try to close websocket to unblock recv loop
-             async def close_ws():
-                 if self._ws:
-                     await self._ws.close()
+            # Try to close websocket to unblock recv loop
+            async def close_ws():
+                if self._ws:
+                    await self._ws.close()
 
-             asyncio.run_coroutine_threadsafe(close_ws(), self._loop)
+            asyncio.run_coroutine_threadsafe(close_ws(), self._loop)
 
 
     def _default_message_handler(self, msg: dict):
@@ -280,5 +281,3 @@ class WebSocketClient:
         """Manually transition to a specific state"""
         ilog.info(f"[MANUAL] Transitioning from {self._state.value} to {state.value}")
         self._state = state
-
-
