@@ -23,7 +23,7 @@ from hinstall import (
     ilog,
 )
 from hytils import yellow
-from .ws_install_client import WsInstallClient
+from .ws_install_client import WsInstallClient, serialize
 from .log_handler import WorkerLogHandler
 from websockets import (
     connect,
@@ -40,10 +40,12 @@ class BackendInstallWorker(QThread):
 
     def __init__(
         self,
-        user_settings: dict[str, Any],
+        settings: dict[str, Any],
+        app_cfg: dict[str, Any],
     ):
         super().__init__()
-        self.user_settings = user_settings
+        self.user_settings = settings
+        self.app_cfg = app_cfg
         self._backend_process: subprocess.Popen = None
 
 
@@ -114,8 +116,17 @@ class BackendInstallWorker(QThread):
         # Server IP
         server_ip = self.user_settings.get('server_ip', "127.0.0.1")
 
+        # Run all async operations in a single event loop
+        # starts a new event loop and runs the coroutine self._async_run
+        asyncio.run(
+            self._async_run(server_ip, backend_script_fp, handler)
+        )
+
+
+    async def _async_run(self, server_ip: str, backend_script_fp: Path, handler):
+        """Run all async operations in a single event loop"""
         # Port detection
-        found_port = self.get_free_port(server_ip)
+        found_port = await self._get_free_port_async(server_ip)
         if found_port is None:
             ilog.removeHandler(handler)
             ilog.critical(f"Another installation is on going or port is used by another process.")
@@ -141,8 +152,8 @@ class BackendInstallWorker(QThread):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 bufsize=1,
-                universal_newlines=True,  # gives str lines, cross-platform
-                start_new_session=False,  # keeps it tied to parent process group
+                universal_newlines=True,
+                start_new_session=False,
             )
 
             # Wait until backend prints "READY"
@@ -158,23 +169,49 @@ class BackendInstallWorker(QThread):
             # Forward stdout
             def forward(stream, target):
                 for line in iter(stream.readline, ""):
-                    target.write(line)
+                    target.write(f"[std] {line}")
                     target.flush()
                     line = line.rstrip()
                 stream.close()
 
             threads = [
-                threading.Thread(target=forward, args=(self._backend_process.stdout, sys.stdout)),
-                threading.Thread(target=forward, args=(self._backend_process.stderr, sys.stderr)),
+                threading.Thread(
+                    target=forward, args=(self._backend_process.stdout, sys.stdout)
+                ),
+                threading.Thread(
+                    target=forward, args=(self._backend_process.stderr, sys.stderr)
+                ),
             ]
             ilog.info(f"Backend server is running")
             for t in threads:
                 t.start()
 
-            # Start the client
+            # backend has to install its own external packages if not local
+            is_local_backend = (
+                self.user_settings.get('server_ip', '127.0.0.1') in ('localhost', '127.0.0.1')
+            )
+            # Use a local host only if dev and local
+            use_local_host = (
+                self.user_settings.get('devmode', False) and is_local_backend
+            )
+
+            # Send this config ans selection to backend.
+            install_config = {
+                'cfg': json.dumps(self.app_cfg),
+                'local_backend': is_local_backend,
+                'reinstall': False,
+                'use_local_host': use_local_host,
+                'local_host': ""
+            }
+
+            # Start the client in the same event loop
             uri = f"ws://{server_ip}:{found_port}"
-            self.client = WsInstallClient(uri)
-            self.client.start()
+            self.client = WsInstallClient(
+                uri,
+                install_config=install_config,
+                stages=1,
+            )
+            await self.client.start()
 
             # wait for the end
             for t in threads:
@@ -186,29 +223,28 @@ class BackendInstallWorker(QThread):
         finally:
             self._backend_process = None
 
-
         ilog.info("Finished the installation of the backend server")
         ilog.removeHandler(handler)
 
 
-    def get_free_port(self, server_ip: str) -> int| None:
+    async def _get_free_port_async(self, server_ip: str) -> int | None:
+        """Async version of get_free_port - runs in the same event loop"""
         found_port = None
 
         # Check ports
         for port in range(49990, 49991):
-            # Probing
-            status = asyncio.run(self.probe_port(server_ip, port))
+            status = await self.probe_port(server_ip, port)
 
             if status == "WS_SERVER":
-                ilog.info(f"Found existing backend server on port {port}.")
+                ilog.info(f"Found existing Installation on going on port {port}.")
                 return None
 
-            elif status == "KILLED":
+            elif status == 'terminated':
                 # Verify that it is really free
                 verified = False
                 for i in range(3):
-                    v_status = asyncio.run(self.probe_port(port))
-                    if v_status == "FREE":
+                    v_status = await self.probe_port(server_ip, port)
+                    if v_status == 'free':
                         verified = True
                         break
                     ilog.info(f"Port {port} verified status={v_status} (attempt {i+1}/3)")
@@ -223,7 +259,7 @@ class BackendInstallWorker(QThread):
                     self.finished.emit(False, [])
                     return None
 
-            elif status == "FREE":
+            elif status == 'free':
                 found_port = port
                 break
 
@@ -239,42 +275,48 @@ class BackendInstallWorker(QThread):
         uri = f"ws://{server_ip}:{port}"
         try:
             async with connect(uri) as wscc:
-                # Send identify command
-                await wscc.send(json.dumps({"cmd": "identify"}))
+
+                # Request server identity
+                await wscc.send(serialize(request='identify'))
 
                 # Wait for response with timeout
                 try:
                     msg = await asyncio.wait_for(wscc.recv(), timeout=1.0)
                     data = json.loads(msg)
+
                 except (asyncio.TimeoutError, json.JSONDecodeError):
                     # Not our server or unresponsive
-                    return "BUSY"
+                    return 'busy'
 
-                # Check identity
-                if data.get("type") == "server_identity" and \
-                    data.get("payload", {}).get("name") == "herlegon install":
+                # Check identity to stop it if a zombie
+                if data.get("response") == "identity":
+                    payload = json.loads(data.get("payload", ""))
+                    if (
+                        payload.get("organization", "") == 'herlegon'
+                        and payload.get("app", "") == 'install'
+                    ):
+                        # Already a websocket serve running
+                        client_count = payload.get("clients", 0)
+                        ilog.info(f"Found herlegon installation with {client_count} clients.")
 
-                    client_count = data["payload"].get("clients", 0)
-                    ilog.info(f"Probe port {port}: Found herlegon install with {client_count} clients.")
+                        if client_count <= 1:
+                            # Only us connected (or 0?), treat as zombie
+                            ilog.info(f"Only 1 client connected (probe). Treating as zombie. Trying to stop it...")
+                            await self.shutdown(wscc=wscc)
+                            return 'terminated'
 
-                    if client_count <= 1:
-                        # Only us connected (or 0?), treat as zombie
-                        ilog.info(f"Only 1 client connected (probe). Treating as zombie. Sending stop...")
-                        await self.shutdown(wscc=wscc)
-                        return "KILLED"
+                        else:
+                            # Actual running instance
+                            return "WS_SERVER"
 
-                    else:
-                        # Actual running instance
-                        return "WS_SERVER"
-
-                return "BUSY"
+                return 'busy'
 
         except (ConnectionRefusedError, OSError):
-            return "FREE"
+            return 'free'
 
         except Exception as e:
             ilog.debug(f"Probe port {port}. exception: {str(e)}")
-            return "BUSY"
+            return 'busy'
 
 
     async def send(self, wscc, data: dict):
@@ -297,12 +339,11 @@ class BackendInstallWorker(QThread):
         if wscc:
             print(yellow(f"{__class__.__name__} shutdown"))
             try:
-                shutdown_command = {"cmd": "shutdown"}
-                await wscc.send(json.dumps(shutdown_command))
+                await wscc.send(serialize(request='shutdown'))
                 ilog.info("Shutdown command sent to server")
 
             except Exception as e:
-                ilog.error(f"Failed to send shutdown command: {e}")
+                ilog.warning(f"Failed to send shutdown command: {e}")
 
         if self._backend_process and self._backend_process.poll() is None:
             ilog.info("Terminating backend process...")

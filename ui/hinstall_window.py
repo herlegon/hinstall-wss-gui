@@ -88,28 +88,30 @@ class InstallerWindow(QMainWindow):
 
         config_fp = (Path(__file__).parent.parent / "tests" / "configs" / f"{tool}.toml").resolve()
 
-        # Load config and populate a list of pages
-        print(f"loading config: {config_fp}")
-        with open(config_fp, "rb") as f:
-            data: dict[str, Any] = tomllib.load(f)
-        packages_cfg = parse_config_(data)
-        xtal_pkgs = ExtPackages(packages_cfg, sys.platform)
-
-        self.pages: list[Type[Page]] = [
-            WelcomePage(self, theme=theme),
-            ThirdPartiesInstallPage(self, theme=theme),
-            BackendInstallPage(self, theme=theme),
-            AiResourceInstallPage(self, theme=theme),
-        ]
-        if xtal_pkgs.get_by_key('ffmpeg') is not None:
-            self.pages.insert(1, FFmpegSelectionPage(self, theme=theme))
-
+        # User settings
         self.user_settings = UserSettings().settings
         self.settings: dict[str, Any] = {
             'devmode': self.dev,
-            'packages': xtal_pkgs,
+            'server_ip': "127.0.0.1",
         }
         self.settings.update(self.user_settings)
+
+        # Load config
+        print(f"loading config: {config_fp}")
+        with open(config_fp, "rb") as f:
+            toml_cfg: dict[str, Any] = tomllib.load(f)
+        packages_cfg = parse_config_(toml_cfg)
+        xtal_pkgs = ExtPackages(packages_cfg, sys.platform)
+
+        # populate a list of pages
+        self.pages: list[Type[Page]] = [
+            WelcomePage(self, theme=theme),
+            ThirdPartiesInstallPage(self, theme=theme, packages=xtal_pkgs),
+            BackendInstallPage(self, theme=theme, app_cfg=toml_cfg),
+            AiResourceInstallPage(self, theme=theme, app_cfg=toml_cfg),
+        ]
+        if xtal_pkgs.get_by_key('ffmpeg') is not None:
+            self.pages.insert(1, FFmpegSelectionPage(self, theme=theme))
 
         self.setWindowTitle("First time installer")
         self.setFixedWidth(1200)

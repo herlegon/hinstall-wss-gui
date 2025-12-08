@@ -34,7 +34,8 @@ class BackendInstallPage(Page, Ui_BackendWidget):
     def __init__(
         self,
         parent: QMainWindow,
-        theme: Type[Theme]
+        theme: Type[Theme],
+        app_cfg: dict[str, str],
     ):
         super().__init__(parent=parent, theme=theme)
         self.setupUi(self, theme=theme)
@@ -53,6 +54,7 @@ class BackendInstallPage(Page, Ui_BackendWidget):
         self.reset_widgets()
 
         self.user_settings: dict[str, Any] = {}
+        self.app_cfg = app_cfg
 
 
     def update_settings(self, settings: dict[str, Any]) -> None:
@@ -64,7 +66,8 @@ class BackendInstallPage(Page, Ui_BackendWidget):
 
         # # Create and start worker
         self.worker: BackendInstallWorker = BackendInstallWorker(
-            user_settings=self.user_settings
+            settings=self.user_settings,
+            app_cfg=self.app_cfg,
         )
         # self.worker.progress.connect(self.slot_update_progress)
         # self.worker.task_name.connect(self.indicator_step.setText)

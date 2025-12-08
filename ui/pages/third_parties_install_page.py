@@ -38,7 +38,8 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
     def __init__(
         self,
         parent: QMainWindow,
-        theme: Type[Theme]
+        theme: Type[Theme],
+        packages: ExtPackages,
     ):
         super().__init__(parent=parent, theme=theme)
         self.setupUi(self, theme=theme)
@@ -51,7 +52,7 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
         self.settings = {}
 
         # Packages to install
-        self.packages: ExtPackages = None
+        self.packages: ExtPackages = packages
 
         self.reset_widgets()
 
@@ -67,7 +68,6 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
     def update_settings(self, settings: dict[str, Any]) -> None:
         self.settings: dict = settings
 
-        self.packages: ExtPackages = self.settings.get('packages', None)
         if self.packages is None:
             return
 

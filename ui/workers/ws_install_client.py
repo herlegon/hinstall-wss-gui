@@ -1,9 +1,11 @@
 from __future__ import annotations
+from dataclasses import asdict, dataclass
 import logging
 from pathlib import Path
+from pprint import pprint
 import subprocess
 import sys
-from typing import Any
+from typing import Any, Literal
 from PySide6.QtCore import QThread, Signal
 from hinstall import (
     download_install_ext_packages,
@@ -19,7 +21,7 @@ import asyncio
 import json
 import time
 from enum import Enum
-import tomllib
+
 from typing import Optional, Callable
 from websockets import (
     connect, ClientConnection,
@@ -29,25 +31,107 @@ from websockets import (
 
 class CommandState(Enum):
     """State machine states for command sequence"""
-    IDLE = "idle"
-    INSTALLING = "installing"
-    STARTING = "starting"
-    RUNNING = "running"
-    DISCARDING = "discarding"
-    RESTARTING = "restarting"
-    ERROR = "error"
+    IDLE = 'idle'
+    PARSING = 'parsing'
+    INSTALL = 'install'
+    INSTALLING = 'installing'
+    RESTART = 'restart'
+    RESTARTING = 'restarting'
+    FETCH_BACKEND_DETAILS = 'fetch_backend_details'
+    FETCHING_BACKEND_DETAILS = 'fetching_backend_details'
+    END = 'end'
+    ERROR = 'error'
 
+
+
+RequestType = Literal[
+    'heartbeat',
+    'identify',
+    'restart',
+    'shutdown',
+    'telemetry',
+
+    # applications:
+    'setup',
+    'convert',
+    # ...
+]
+
+
+ResponseType = Literal[
+    'pong',
+    'identity',
+    'setup',
+]
+
+
+EventType = Literal[
+    'msg',
+    'telemetry',
+    'status',
+]
+
+
+SetupTaskId = Literal[
+    'parse',
+    'install',
+]
+
+
+
+@dataclass(slots=True)
+class RequestMessage:
+    type: RequestType
+    payload: dict | None = None
+
+
+
+@dataclass(slots=True)
+class ResponseMessage:
+    type: ResponseType
+    payload: dict | None = None
+
+
+
+@dataclass(slots=True)
+class EventMessage:
+    type: EventType
+    payload: dict | None = None
+
+
+
+def serialize(msg: RequestMessage) -> str:
+    return json.dumps(asdict(msg))
+
+
+def deserialize(msg: ResponseMessage | EventMessage) -> dict:
+    return json.loads(msg)
 
 
 class WsInstallClient:
-    def __init__(self, uri: str, on_message: Optional[Callable] = None):
+    def __init__(
+        self,
+        uri: str,
+        install_config: dict,
+        stages: int | list[int],
+        on_message: Optional[Callable] = None
+    ):
+        # Stages from 0 to 2
+        #   0: external packages
+        #   1: backend packages
+        #   2: AI packages
         self._uri = uri
+        self.install_config = install_config
+        self.stages: list[int] = (
+            stages if isinstance(stages, list | tuple) else [stages,]
+        )
         self._ws: Optional[ClientConnection] = None
         self._running = False
         self._last_pong = None
         self._state = CommandState.IDLE
         self._on_message = on_message or self._default_message_handler
         self._loop = None
+        self.event = ''
 
 
     async def _main(self):
@@ -74,9 +158,9 @@ class WsInstallClient:
                     ws.pong_handler = lambda _: setattr(self, "_last_pong", time.time())
 
                     await asyncio.gather(
-                        self._recv_loop(),
+                        self._reception_loop(),
                         self._heartbeat_loop(),
-                        self._command_state_machine(),
+                        self.state_machine(),
                     )
 
             except (ConnectionClosedError, ConnectionClosedOK) as e:
@@ -124,110 +208,134 @@ class WsInstallClient:
 
 
     def _default_message_handler(self, msg: dict):
-        ilog.info(f"Message received: {msg}")
+        ilog.debug(f"Message received: {msg}")
 
 
-    async def _recv_loop(self):
+
+    async def _reception_loop(self):
         """Receive messages from server"""
         try:
             while self._running and self._ws:
                 msg = await self._ws.recv()
-                data = json.loads(msg)
+                data: dict = deserialize(msg)
+
+                # For debug
                 self._on_message(data)
-                self._update_state_from_response(data)
+                self.handle_received_message(data)
+
         except Exception as e:
             ilog.error(f"[ERROR] Receive loop error: {e}")
 
 
-    async def _heartbeat_loop(self):
-        """Send periodic heartbeat"""
-        while self._running and self._ws:
-            try:
-                await self.send({"cmd": "heartbeat"})
 
-                if self._last_pong is None:
-                    self._last_pong = time.time()
-                elif time.time() - self._last_pong > 10:
-                    ilog.error("[ERROR] Backend unresponsive")
-                    self._state = CommandState.ERROR
-                    break
+    def handle_received_message(self, data: dict):
+        """Process and dispatch the received message based on its type"""
+        try:
+            # Check the 'type' field to determine if it's a Response or Event
+            msg_type = data.get('type')
 
-                await asyncio.sleep(3)
-            except Exception as e:
-                ilog.error(f"[ERROR] Heartbeat error: {e}")
-                break
+            if msg_type in ResponseType.__args__:
+                response = ResponseMessage(**data)
+                self.handle_response(response)
+
+            elif msg_type in EventType.__args__:
+                event = EventMessage(**data)
+                self.handle_event(event)
+
+            else:
+                ilog.error(f"Unknown message type: {msg_type}")
+
+        except Exception as e:
+            ilog.error(f"[ERROR] Failed to handle received message: {e}")
 
 
-    async def _command_state_machine(self):
+
+    def handle_event(self, event: EventMessage) -> None:
+        """Handle EventMessage"""
+        if event.type == "msg":
+            # Handle message event
+            pass
+        elif event.type == "telemetry":
+            # Handle telemetry event
+            pass
+        elif event.type == "status":
+            # Handle status event
+            pass
+
+
+    def handle_response(self, response: ResponseMessage) -> None:
+        """Handle ResponseMessage
+        """
+        if response.type == 'pong':
+            self._last_pong = time.time()
+            return
+
+        if response.type != 'install':
+            return
+
+
+        task_result = response.payload
+        print(task_result)
+
+
+
+
+
+
+    async def state_machine(self):
         """State machine that sends commands in sequence"""
+        self.event = ''
         while self._running and self._ws:
+
             try:
                 if self._state == CommandState.IDLE:
-                    ilog.info("[STATE] Transitioning to INSTALLING")
+                    task = {
+                        'task_id': 'parse',
+                        **self.install_config
+                    }
+                    await self.send_setup_task(task)
+                    self.event = ''
+                    self._state = CommandState.PARSING
 
-                    tool = "hconvert"
-                    # Config file is located in tests/configs
-                    config_fp = (Path(__file__).parent.parent.parent / "tests" / "configs" / f"{tool}.toml").resolve()
-                    ilog.info(f"loading config: {config_fp}")
 
-                    if config_fp.exists():
-                        with open(config_fp, "rb") as f:
-                            data: dict[str, Any] = tomllib.load(f)
+                elif self._state == CommandState.PARSING:
+                    if self.event == 'parsed':
+                        self._state = CommandState.INSTALL
+                    await asyncio.sleep(0.5)
 
-                        await self.send(
-                            {
-                                "cmd": "install",
-                                "payload": {
-                                    "cfg": json.dumps(data),
-                                    "reinstall": False,
-                                    "use_local_host": True,
-                                    "local_host": ""
-                                }
-                            }
-                        )
-                        self._state = CommandState.INSTALLING
-                    else:
-                        ilog.error(f"Config file not found: {config_fp}")
-                        self._state = CommandState.ERROR
 
-                    await asyncio.sleep(0)
+                elif self._state == CommandState.INSTALL:
+                    if not self.stages:
+                        self._state = CommandState.END
+
+                    stage_no = self.stages.pop()
+                    task = {
+                        'task_id': 'install',
+                        'stage_no': stage_no
+                    }
+                    await self.send_setup_task(task)
+                    self._state = CommandState.INSTALLING
+
 
                 elif self._state == CommandState.INSTALLING:
-                    # Wait for install response (handled in _update_state_from_response)
-                    await asyncio.sleep(1)
-
-                elif self._state == CommandState.STARTING:
-                    ilog.info("[STATE] Transitioning to STARTING")
-                    await self.send({"cmd": "start"})
                     await asyncio.sleep(2)
 
-                elif self._state == CommandState.RUNNING:
-                    ilog.info("[STATE] System RUNNING")
-                    # Optionally transition to restart after some time
-                    await asyncio.sleep(5)
-                    # For installing worker, maybe we just stop after success or keep running?
-                    # The test script restarts. Let's keep it but logging only.
-                    # ilog.info("[STATE] Transitioning to RESTARTING")
-                    # await self.send({"cmd": "restart"})
-                    # self._state = CommandState.RESTARTING
-                    # await asyncio.sleep(2)
 
                 elif self._state == CommandState.RESTARTING:
                     # Wait for restart to complete
                     await asyncio.sleep(1)
 
-                elif self._state == CommandState.DISCARDING:
-                    ilog.info("[STATE] Transitioning to DISCARDING")
-                    await self.send({"cmd": "discard"})
-                    self._state = CommandState.IDLE
-                    await asyncio.sleep(2)
 
                 elif self._state == CommandState.ERROR:
                     ilog.info("[STATE] Error state reached, breaking state machine")
                     break
 
+                elif self._state == CommandState.FETCH_BACKEND_DETAILS:
+                    break
+
+
                 else:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(2)
 
             except Exception as e:
                 ilog.error(f"[ERROR] State machine error: {e}")
@@ -235,49 +343,110 @@ class WsInstallClient:
                 break
 
 
-    def _update_state_from_response(self, response: dict):
-        """Update state machine based on server response"""
-        cmd = response.get("cmd")
-        status = response.get("status", "")
+    def process_reception(self, packet: dict):
+        """Update state machine based on server response
+        """
+        packet_type: ResponseType = packet.get("type")
+        payload = packet.get('payload', None)
 
-        if cmd == "install" and status == "success":
-            ilog.info("[RESPONSE] Install successful")
-            self._state = CommandState.STARTING
-
-        elif cmd == "start" and status == "success":
-            ilog.info("[RESPONSE] Start successful")
-            self._state = CommandState.RUNNING
-        elif cmd == "restart" and status == "success":
-            ilog.info("[RESPONSE] Restart successful")
-            self._state = CommandState.RUNNING
-        elif cmd == "discard" and status == "success":
-            ilog.info("[RESPONSE] Discard successful")
-            self._state = CommandState.IDLE
-        elif status == "error":
-            ilog.info(f"[RESPONSE] Command failed: {response.get('error', 'Unknown error')}")
-            self._state = CommandState.ERROR
+        pprint(packet)
+        # if response_type == 'pong':
+        # elif response_type == 'status':
+        # elif response_type == 'warning':
+        # elif response_type == 'error':
+        # elif response_type == 'exception':
 
 
-    async def send(self, data: dict):
+
+
+
+        # if type == 'install' and status == "success":
+        #     ilog.info("[RESPONSE] Install successful")
+        #     self._state = CommandState.STARTING
+
+
+        # elif type == "start" and status == "success":
+        #     ilog.info("[RESPONSE] Start successful")
+        #     self._state = CommandState.RUNNING
+
+
+        # elif type == "restart" and status == "success":
+        #     ilog.info("[RESPONSE] Restart successful")
+        #     self._state = CommandState.RUNNING
+
+
+        # elif type == "discard" and status == "success":
+        #     ilog.info("[RESPONSE] Discard successful")
+        #     self._state = CommandState.IDLE
+
+
+        # elif status == 'error"'
+        #     ilog.info(f"[RESPONSE] Command failed: {response.get('error', 'Unknown error')}")
+        #     self._state = CommandState.ERROR
+
+
+
+    async def _send_message(self, message: RequestMessage | str):
         """Send command to server"""
         if not self._ws:
             ilog.warning("[WARNING] Attempted to send while not connected")
             return
+
         try:
-            await self._ws.send(json.dumps(data))
-            ilog.info(f"[SEND] {data}")
+            msg = (
+                serialize(message)
+                if not isinstance(message, str)
+                else message
+            )
+            await self._ws.send(msg)
+            ilog.info(f"[SEND] {msg}")
+
         except Exception as e:
             ilog.error(f"[ERROR] Send failed: {e}")
 
 
-    def send_command(self, data: dict):
-        """Send command from a different thread"""
-        if self._loop:
-            ilog.info(f"[SEND] Scheduling: {data}")
-            asyncio.run_coroutine_threadsafe(self.send(data), self._loop)
+    async def send_setup_task(self, task: dict[str, Any]):
+        await self._send_message(
+            RequestMessage(type='setup', payload=task)
+        )
 
 
-    def transition_to(self, state: CommandState):
-        """Manually transition to a specific state"""
-        ilog.info(f"[MANUAL] Transitioning from {self._state.value} to {state.value}")
-        self._state = state
+    async def send_restart_request(self):
+        await self._send_message(RequestMessage(type='restart'))
+
+
+    async def send_identify_request(self):
+        await self._send_message(RequestMessage(type='identify'))
+
+
+    async def send_shutdown_request(self):
+        await self._send_message(RequestMessage(type='shutdowns'))
+
+
+
+    async def _heartbeat_loop(self):
+        """Send periodic heartbeat, to see if everything is ok
+        while running a long task
+        """
+        heartbeat_msg = serialize(RequestMessage(type='heartbeat'))
+        while self._running and self._ws:
+            try:
+                await self._send_message(heartbeat_msg)
+
+                if self._last_pong is None:
+                    self._last_pong = time.time()
+
+                elif time.time() - self._last_pong > 10:
+                    ilog.error("[ERROR] Backend unresponsive")
+                    self._state = CommandState.ERROR
+                    break
+
+                else:
+                    print(time.time() - self._last_pong)
+
+                await asyncio.sleep(2)
+
+            except Exception as e:
+                ilog.error(f"[ERROR] Heartbeat error: {e}")
+                break
+

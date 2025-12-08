@@ -26,13 +26,15 @@ class AiResourceInstallPage(Page, Ui_AiResourceInstallWidget):
     def __init__(
         self,
         parent: QMainWindow,
-        theme: Type[Theme]
+        theme: Type[Theme],
+        app_cfg: dict[str, str],
     ):
         super().__init__(parent=parent, theme=theme)
         self.setupUi(self, theme=theme)
         self._step_label = "AI Computational Resource"
 
         self.reset_widgets()
+        self.app_cfg = app_cfg
 
 
     def update_settings(self, settings: dict[str, Any]) -> None:
