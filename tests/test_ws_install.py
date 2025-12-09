@@ -145,7 +145,7 @@ class WsInstallClient:
 
 
     def _default_message_handler(self, msg: dict):
-        # print(yellow(msg))
+        print(lightcyan("rcv"), msg)
         # ilog.debug(f"Message received: {msg}")
         pass
 
@@ -158,7 +158,7 @@ class WsInstallClient:
                 data: dict = deserialize(msg)
 
                 # For debug
-                # self._on_message(data)
+                self._on_message(data)
                 self.handle_received_message(data)
 
         except Exception as e:

@@ -584,10 +584,8 @@ class PyPackage:
                             else:
                                 eta_str = "calculating..."
 
-                            ilog.info(
-                                f"  {percentage:6.1f}% | {size_mb:7.1f}/{total_mb:7.1f} MB | "
-                                f"{speed_mbps:6.1f} MB/s | ETA: {eta_str}"
-                            )
+                            ilog.debug(f"Downloaded {size_mb:.1f}/{total_mb:.1f} MB | {speed_mbps:.1f} MB/s | ETA: {eta_str}")
+                            ilog.status(f"[pg]{percentage}")
                             last_log_time = current_time
 
                 else:
@@ -599,7 +597,7 @@ class PyPackage:
 
             elapsed = time.time() - start_time
             speed_mbps = (downloaded / (1024**2)) / elapsed if elapsed > 0 else 0
-            ilog.info(f"✓ Downloaded {self.wheel} ({downloaded / (1024**2):.1f} MB in {self.format_time(elapsed)} at {speed_mbps:.1f} MB/s)")
+            ilog.info(f"Downloaded {self.wheel} ({downloaded / (1024**2):.1f} MB in {self.format_time(elapsed)} at {speed_mbps:.1f} MB/s)")
 
             return True
 
