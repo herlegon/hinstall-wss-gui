@@ -11,6 +11,8 @@ from websockets import (
     connect, ClientConnection,
     ConnectionClosedError, ConnectionClosedOK,
 )
+
+from hytils import lightcyan, orange, yellow
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from hinstall import (
     ilog,
@@ -143,7 +145,8 @@ class WsInstallClient:
 
 
     def _default_message_handler(self, msg: dict):
-        ilog.debug(f"Message received: {msg}")
+        print(yellow(msg))
+        # ilog.debug(f"Message received: {msg}")
 
 
     async def _reception_task(self):
@@ -154,7 +157,7 @@ class WsInstallClient:
                 data: dict = deserialize(msg)
 
                 # For debug
-                # self._on_message(data)
+                self._on_message(data)
                 self.handle_received_message(data)
 
         except Exception as e:
@@ -188,7 +191,7 @@ class WsInstallClient:
         """Handle EventMessage"""
         if event.type == "msg":
             # Handle message event
-            pass
+            print(orange(event))
 
         elif event.type == "telemetry":
             # Handle telemetry event
@@ -402,6 +405,7 @@ async def main():
         toml_cfg: dict[str, Any] = tomllib.load(f)
 
     install_config = {
+        'app_name': "hconvert",
         'cfg': json.dumps(toml_cfg),
         'local_backend': local_backend,
         'reinstall': False,
