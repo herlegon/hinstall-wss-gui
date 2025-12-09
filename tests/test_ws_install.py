@@ -145,8 +145,9 @@ class WsInstallClient:
 
 
     def _default_message_handler(self, msg: dict):
-        print(yellow(msg))
+        # print(yellow(msg))
         # ilog.debug(f"Message received: {msg}")
+        pass
 
 
     async def _reception_task(self):
@@ -157,7 +158,7 @@ class WsInstallClient:
                 data: dict = deserialize(msg)
 
                 # For debug
-                self._on_message(data)
+                # self._on_message(data)
                 self.handle_received_message(data)
 
         except Exception as e:
@@ -191,7 +192,9 @@ class WsInstallClient:
         """Handle EventMessage"""
         if event.type == "msg":
             # Handle message event
-            print(orange(event))
+            # print(orange(event))
+            print(f"handle_event: {event}")
+            pass
 
         elif event.type == "telemetry":
             # Handle telemetry event

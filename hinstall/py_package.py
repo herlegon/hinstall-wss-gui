@@ -49,10 +49,10 @@ class PyPackage:
     do_cache: bool = False
 
     _retry_count: int = 3
-    
+
     # Optional callback for progress updates
     progress_callback: Optional[Callable[[str, str], None]] = field(default=None, repr=False)
-    
+
     # Optional callback for log messages (type, text)
     message_callback: Optional[Callable[[str, str], None]] = field(default=None, repr=False)
 
@@ -88,34 +88,6 @@ class PyPackage:
         ):
             self.version = self._installed_version
             self.installed = True
-
-
-    def _log_message(self, msg_type: str, text: str) -> None:
-        """
-        Log a message. If message_callback is set, use it; otherwise log to ilog.
-        
-        Args:
-            msg_type: Message type ('critical', 'error', 'warning', 'info', 'debug')
-            text: Message text
-        """
-        # Always log locally
-        log_method = getattr(ilog, msg_type, ilog.info)
-        log_method(text)
-        
-        # Also send to callback if available
-        if self.message_callback:
-            self.message_callback(msg_type, text)
-
-
-    def _send_progress(self, message: str) -> None:
-        """
-        Send progress update. If progress_callback is set, use it; otherwise do nothing.
-        
-        Args:
-            message: Progress message
-        """
-        if self.progress_callback:
-            self.progress_callback(self.name, message)
 
 
     def resolve_tensorrt_wheel(self) -> bool:
@@ -486,7 +458,7 @@ class PyPackage:
 
 
     def _download_wheel_with_pip(self, force: bool = False) -> bool:
-        ilog.info(f"{self.name} use pip to download wheel")
+        ilog.debug(f"{self.name} use pip to download wheel")
         python_exe = str(g_backend_dirs.python_exe)
         cache_dir: Path = g_backend_dirs.cache
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -504,7 +476,7 @@ class PyPackage:
             wheel_fp.unlink(missing_ok=True)
             cmd = f"{cmd} --no-cache-dir"
 
-        ilog.debug(yellow(cmd))
+        ilog.debug(cmd)
 
         env = generate_backend_env(exclude_append=['proxy',])
         try:
@@ -521,15 +493,15 @@ class PyPackage:
                 return True
 
             else:
-                self._log_message('critical', f"{self.name} download failed: {result.stdout}")
+                ilog.critical(f"{self.name} download failed: {result.stdout}")
                 return False
 
         except subprocess.CalledProcessError as e:
-            self._log_message('critical', f"{self.name} failed to downloaded package {e.stderr}")
+            ilog.critical(f"{self.name} failed to downloaded package {e.stderr}")
             return False
 
         except Exception as e:
-            self._log_message('critical', f"{self.name} download encountered an error: {str(e)}")
+            ilog.critical(f"{self.name} download encountered an error: {str(e)}")
             return False
 
         return False
@@ -553,7 +525,7 @@ class PyPackage:
         force: bool = False,
         stall_timeout: float = 30,
     ) -> bool:
-        ilog.info(f"{self.name} use requests to download wheel")
+        ilog.debug(f"{self.name} use requests to download wheel")
         cache_dir: Path = g_backend_dirs.cache
         cache_dir.mkdir(parents=True, exist_ok=True)
         wheel_fp: Path = cache_dir / self.wheel
@@ -577,11 +549,11 @@ class PyPackage:
                 and wheel_fp.is_file()
                 and wheel_fp.stat().st_size == total_size
             ):
-                ilog.info(f"{self.name} File was already downloaded")
+                ilog.info(f"File was already downloaded for package {self.name}")
                 self.downloaded = True
                 return True
 
-            ilog.info(f"Downloading {self.wheel}...")
+            ilog.info(f"Downloading {self.wheel}")
             downloaded = 0
             start_time = time.time()
             last_log_time = start_time
@@ -632,13 +604,13 @@ class PyPackage:
             return True
 
         except requests.exceptions.RequestException as e:
-            self._log_message('error', f"Download failed: {str(e)}")
+            ilog.error(f"Download failed: {str(e)}")
             # Clean up partial file
             wheel_fp.unlink(missing_ok=True)
             return False
 
         except Exception as e:
-            self._log_message('critical', f"Unexpected error downloading {self.wheel}: {str(e)}")
+            ilog.critical(f"Unexpected error downloading {self.wheel}: {str(e)}")
             wheel_fp.unlink(missing_ok=True)
             return False
 
@@ -657,10 +629,7 @@ class PyPackage:
 
         g_backend_dirs.cache.mkdir(parents=True, exist_ok=True)
         wheel_fp = g_backend_dirs.cache / self.wheel
-        ilog.info(f"{self.name} download to {wheel_fp}")
-        
-        # Send progress update
-        self._send_progress(f"Downloading {self.name}")
+        ilog.info(f"Download {self.name} as {wheel_fp}")
 
         if not self.wheel_url or use_pip:
             return self._download_wheel_with_pip(force=force)
@@ -690,10 +659,13 @@ class PyPackage:
                 if "Successfully installed" in result.stdout.splitlines()[-1]:
                     ilog.info(f"{self.name} successfully installed for dev.")
                     installed = True
+
                 else:
                     ilog.critical(f"{self.name} installation failed: {result.stdout}")
+
             except subprocess.CalledProcessError as e:
                 ilog.critical(f"{self.name} failed to install package for dev: {e.stderr}")
+
             except Exception as e:
                 ilog.critical(f"{self.name} installation encountered an error: {str(e)}")
 
@@ -706,10 +678,10 @@ class PyPackage:
 
     def install(self, reinstall: bool = False, recover: bool = False) -> bool:
         ilog.info(f"{self.name} installing {self.version}")
-        
+
         # Send progress update
-        self._send_progress(f"Installing {self.name} {self.version}")
-        
+        ilog.info(f"Installing {self.name} {self.version}")
+
         if self.version == 'dev':
             if not self.installed:
                 self.installed = self._install_dev()
@@ -756,23 +728,18 @@ class PyPackage:
                 "Successfully installed" in last_line
                 or "Requirement already satisfied"  in last_line
             ):
-                ilog.info(f"{self.name} successfully installed")
-                self._send_progress(f"Successfully installed {self.name}")
+                ilog.info(f"Successfully installed {self.name}")
                 return True
 
             else:
-                self._log_message('critical', f"{self.name} installation failed: {last_line}")
-                self._send_progress(f"Failed to install {self.name}")
-                pprint(self)
+                ilog.critical(f"Failed to install {self.name}")
                 return False
 
         except subprocess.CalledProcessError as e:
-            self._log_message('critical', f"{self.name} failed to install package {e.stderr}")
-            self._send_progress(f"Error installing {self.name}")
+            ilog.critical(f"Error installing {self.name}: {e.stderr}")
             return False
 
         except Exception as e:
-            self._log_message('critical', f"{self.name} installation encountered an error: {str(e)}")
-            self._send_progress(f"Error installing {self.name}")
+            ilog.critical(f"Error installing {self.name}: {str(e)}")
             return False
 
