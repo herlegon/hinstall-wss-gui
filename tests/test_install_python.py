@@ -30,7 +30,7 @@ if __name__ == "__main__":
     packages_cfg = parse_config_(data)
     external_packages = ExtPackages(packages_cfg, sys.platform)
 
-    g_backend_dirs.local_host = get_rehost_dir()
+    g_backend_dirs.local_rehost = get_rehost_dir()
 
     python_package = external_packages.get_by_key('python')
     print(lightcyan(" ".join (("-" * 40, "python", "-" * 40))))
@@ -42,7 +42,7 @@ if __name__ == "__main__":
             packages=python_package,
             reinstall=True,
             threads=1,
-            use_local_host=True
+            use_local_rehost=True
         )
         if installed:
             print(lightgreen("Python package installed"))

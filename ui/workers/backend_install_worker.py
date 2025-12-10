@@ -193,7 +193,7 @@ class BackendInstallWorker(QThread):
                 self.user_settings.get('server_ip', '127.0.0.1') in ('localhost', '127.0.0.1')
             )
             # Use a local host only if dev and local
-            use_local_host = (
+            use_local_rehost = (
                 self.user_settings.get('devmode', False) and is_local_backend
             )
 
@@ -202,8 +202,8 @@ class BackendInstallWorker(QThread):
                 'cfg': json.dumps(self.app_cfg),
                 'local_backend': is_local_backend,
                 'reinstall': False,
-                'use_local_host': use_local_host,
-                'local_host': ""
+                'use_local_rehost': use_local_rehost,
+                'local_rehost': ""
             }
 
             # Start the client in the same event loop

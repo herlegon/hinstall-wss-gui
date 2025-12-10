@@ -216,7 +216,10 @@ class WsInstallClient:
 
         elif event.type == "progress":
             p: InstallProgress = InstallProgress(**event.payload)
-            print(f"[PROGRESS] {p.task_id} {p.package_name} {p.progress}")
+            if p.type == 'indet' and p.progress != 100:
+                print(f"[PROGRESS][INDENT] {p.task_id} {p.package_name}")
+            else:
+                print(f"[PROGRESS] {p.task_id} {p.package_name} {p.progress}")
 
 
 
@@ -414,7 +417,7 @@ async def main():
     server_ip: str = "127.0.0.1"
     port: int = 49990
     local_backend = True
-    use_local_host = True
+    use_local_rehost = True
 
     tool = "hconvert"
     config_fp = (Path(__file__).parent.parent / "tests" / "configs" / f"{tool}.toml").resolve()
@@ -429,8 +432,8 @@ async def main():
         'cfg': json.dumps(toml_cfg),
         'local_backend': local_backend,
         'reinstall': False,
-        'use_local_host': use_local_host,
-        'local_host': ""
+        'use_local_rehost': use_local_rehost,
+        'local_rehost': ""
     }
 
     uri = f"ws://{server_ip}:{port}"

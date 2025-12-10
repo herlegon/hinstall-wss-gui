@@ -30,7 +30,7 @@ def run_installer_and_wait(
             else get_rehost_dir()
         )
         if rehost_dir is not None and rehost_dir.exists():
-            backend_dirs.local_host = rehost_dir
+            backend_dirs.local_rehost = rehost_dir
 
     if reinstall:
         for subdir in backend_dirs.app.iterdir():

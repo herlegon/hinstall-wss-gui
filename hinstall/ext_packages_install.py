@@ -32,10 +32,10 @@ def download_package_(
     # Use local host to simulate a download
     if (
         not is_cached
-        and package.use_local_host
-        and g_backend_dirs.local_host
+        and package.use_local_rehost
+        and g_backend_dirs.local_rehost
     ):
-        package.download_from_local_host()
+        package.download_from_local_rehost()
 
     # Finally download it from host
     if not package.downloaded and package.downloadable:
@@ -73,7 +73,7 @@ def download_install_ext_packages(
     retry: int = 3,
     threads: int = 1,
     reinstall: bool = False,
-    use_local_host: bool = False,
+    use_local_rehost: bool = False,
 ) -> bool:
     """Entry point to install packages.
     Use only a single thread when used with GUI because of progress bar
@@ -88,12 +88,12 @@ def download_install_ext_packages(
             else []
         )
 
-    if use_local_host and g_backend_dirs.local_host is None:
-        ilog.error("g_backend_dirs.local_host shall be set before downloading")
+    if use_local_rehost and g_backend_dirs.local_rehost is None:
+        ilog.error("g_backend_dirs.local_rehost shall be set before downloading")
         return False
 
     for pkg in packages:
-        pkg.use_local_host = use_local_host
+        pkg.use_local_rehost = use_local_rehost
         pkg.retry_count = retry
 
     threads = min(max(threads, 1), len(packages))

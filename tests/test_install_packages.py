@@ -38,7 +38,7 @@ if __name__ == "__main__":
     pprint(packages_to_install)
     print()
 
-    g_backend_dirs.local_host = get_rehost_dir()
+    g_backend_dirs.local_rehost = get_rehost_dir()
     print(lightcyan(" ".join (("-" * 40, "backend directories", "-" * 40))))
     pprint(g_backend_dirs)
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
             packages=packages_to_install,
             reinstall=True,
             threads=1,
-            use_local_host=True
+            use_local_rehost=True
         )
         if installed:
             print(lightgreen("All packages installed"))

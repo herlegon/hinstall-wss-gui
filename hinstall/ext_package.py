@@ -48,7 +48,7 @@ class ExtPackage:
     cache_file: Path = None
     do_cache: bool = False
 
-    _use_local_host: bool = False
+    _use_local_rehost: bool = False
     _retry_count: int = 3
 
     def __post_init__(self):
@@ -69,13 +69,13 @@ class ExtPackage:
 
 
     @property
-    def use_local_host(self) -> bool:
-        return self._use_local_host
+    def use_local_rehost(self) -> bool:
+        return self._use_local_rehost
 
 
-    @use_local_host.setter
-    def use_local_host(self, enable: bool) -> None:
-        self._use_local_host = enable
+    @use_local_rehost.setter
+    def use_local_rehost(self, enable: bool) -> None:
+        self._use_local_rehost = enable
 
 
     def _update_cache_file(self) -> Path:
@@ -91,11 +91,11 @@ class ExtPackage:
         self.downloadable: bool = False
         self._update_cache_file()
 
-        if self.use_local_host:
-            local_host = g_backend_dirs.local_host
-            if local_host and local_host.is_dir():
+        if self.use_local_rehost:
+            local_rehost = g_backend_dirs.local_rehost
+            if local_rehost and local_rehost.is_dir():
                 # Use local rehost for testing purpose
-                local_rehost_fp: Path = local_host / self.filename
+                local_rehost_fp: Path = local_rehost / self.filename
                 if local_rehost_fp.is_file():
                     dt = datetime.fromtimestamp(local_rehost_fp.stat().st_mtime)
                     formatted_time = dt.strftime("%Y-%m-%dT%H-%M-%S")
@@ -106,7 +106,7 @@ class ExtPackage:
                 else:
                     ilog.warning(f"Asked to use local host, but file {local_rehost_fp} not found")
             else:
-                ilog.warning(f"Asked to use local host ({local_host}) but directory doesn't exist")
+                ilog.warning(f"Asked to use local host ({local_rehost}) but directory doesn't exist")
 
         else:
             # Get info from host and update package info
@@ -239,11 +239,11 @@ class ExtPackage:
 
 
 
-    def download_from_local_host(self) -> bool:
-        if g_backend_dirs.local_host is None:
-            raise ValueError(f"local_host must be defined")
+    def download_from_local_rehost(self) -> bool:
+        if g_backend_dirs.local_rehost is None:
+            raise ValueError(f"local_rehost must be defined")
 
-        local_fp: Path = g_backend_dirs.local_host / self.filename
+        local_fp: Path = g_backend_dirs.local_rehost / self.filename
         ilog.debug(f"[{self.name}] download from local host: {local_fp}")
         ilog.status(f"[sd]{self.name}")
 

@@ -12,13 +12,13 @@ class BackendDirectories:
     external: Path
     cache: Path
     models: Path
-    local_host: Path = None
+    local_rehost: Path = None
 
 
 
 def get_backend_dirs(
-    app_name: str = "herlecon_convert",
-    company: str = "herlegon"
+    app_name: str = "hconvert",
+    organization: str = "herlegon"
 ) -> BackendDirectories:
     """Get platform-specific backend directory"""
 
@@ -27,30 +27,31 @@ def get_backend_dirs(
         base = Path(
             os.environ.get('LOCALAPPDATA', Path.home() / "AppData" / "Local")
         )
-        cache_dir = base / company / "cache"
+        cache_dir = base / organization / "cache"
         python_exe = "python.exe"
 
     elif sys.platform == "linux":
         # Linux: Use XDG Base Directory
         base = Path(os.environ.get('XDG_DATA_HOME', Path.home() / ".local" / "share"))
-        cache_dir = Path(os.environ.get('XDG_DATA_HOME', Path.home() / company / "cache"))
+        # Use this dir for dev because limited bandwidth to never delete it
+        cache_dir = Path(f"/opt/{organization}/cache")
         python_exe = Path("bin") / "python"
 
     elif sys.platform == "darwin":
         # macOS: Use Application Support
         base = Path.home() / "Library" / "Application Support"
-        cache_dir = base / company / "cache"
+        cache_dir = base / organization / "cache"
         python_exe = "python"
 
     else:
         ilog.error(f"Unsupported platform: {sys.platform}")
 
     return BackendDirectories(
-        app=base / company / app_name,
-        python_exe=base / company / "python" / python_exe,
-        external=base / company,
+        app=base / organization / app_name,
+        python_exe=base / organization / "python" / python_exe,
+        external=base / organization,
         cache=cache_dir,
-        models=base / company / "models",
+        models=base / organization / "models",
     )
 g_backend_dirs: BackendDirectories = get_backend_dirs()
 
@@ -66,6 +67,6 @@ def get_local_dev_dir() -> Path:
         local_dev_dir = Path.home() / "github"
 
     elif sys.platform == "darwin":
-        local_dev_dir = Path.home() / company / "rehost"
+        local_dev_dir = Path.home() / organization
 
     return local_dev_dir

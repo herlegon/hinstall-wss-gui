@@ -93,14 +93,14 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
                 p.do_cache = False
 
         # Set the local rehost
-        g_backend_dirs.local_host = get_rehost_dir()
+        g_backend_dirs.local_rehost = get_rehost_dir()
 
         # Create and start worker
         self.worker: PkgInstallWorker = PkgInstallWorker(
             packages=self.packages,
             reinstall=False,
             threads=1,
-            use_local_host=self.settings.get('devmode', False)
+            use_local_rehost=self.settings.get('devmode', False)
         )
         self.worker.progress.connect(self.slot_update_progress)
         self.worker.task_name.connect(self.indicator_step.setText)

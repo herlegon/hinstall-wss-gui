@@ -15,12 +15,12 @@ class PkgInstallWorker(QThread):
     finished = Signal(bool, list)
 
 
-    def __init__(self, packages: ExtPackages, reinstall: bool = True, threads: int = 1, use_local_host: bool = True):
+    def __init__(self, packages: ExtPackages, reinstall: bool = True, threads: int = 1, use_local_rehost: bool = True):
         super().__init__()
         self.packages = packages
         self.reinstall = reinstall
         self.threads = threads
-        self.use_local_host = use_local_host
+        self.use_local_rehost = use_local_rehost
         self.total_packages = len(packages) if packages else 0
         self.current_package = 0
 
@@ -36,7 +36,7 @@ class PkgInstallWorker(QThread):
                 packages=self.packages,
                 reinstall=self.reinstall,
                 threads=self.threads,
-                use_local_host=self.use_local_host
+                use_local_rehost=self.use_local_rehost
             )
 
             if installed:

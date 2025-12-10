@@ -4,7 +4,9 @@ from pathlib import Path
 import platform
 from pprint import pprint
 import re
+import shutil
 import sysconfig
+import tempfile
 import time
 from typing import Callable, Literal, Optional
 import requests
@@ -469,10 +471,12 @@ class PyPackage:
             )
         )
 
+
     def send_update_progress(self, progress: float) -> None:
         ilog.progress(
             InstallProgress(
                 package_name=self.name,
+                type='progress',
                 progress=progress,
             )
         )
@@ -540,24 +544,44 @@ class PyPackage:
             return f"{hours:.1f}h"
 
 
+    def get_cache_dir(self) -> Path:
+        if self.do_cache:
+            return g_backend_dirs.cache
+        else:
+            return  Path(tempfile.gettempdir()) / "herlegon"
+
+
+    def download_from_local_rehost(self) -> bool:
+        downloaded: bool = False
+
+        if g_backend_dirs.local_rehost is None:
+            ilog.debug(f"Local rehost doesn't exist: {g_backend_dirs.local_rehost}")
+            return False
+
+        local_fp: Path = g_backend_dirs.local_rehost / self.wheel
+        cache_dir = self.get_cache_dir()
+        ilog.debug(f"Download {self.name} from local host: {local_fp} to {cache_dir}")
+
+        # Copy from local rehost to cache
+        if local_fp.exists() and self.do_cache:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy(local_fp, cache_dir)
+            downloaded = True
+
+        else:
+            ilog.debug(f"Wheel not found on local rehost")
+
+        return downloaded
+
+
     def _download_wheel_with_requests(
         self,
         force: bool = False,
         stall_timeout: float = 30,
     ) -> bool:
         ilog.debug(f"{self.name} use requests to download wheel")
-        cache_dir: Path = g_backend_dirs.cache
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        wheel_fp: Path = cache_dir / self.wheel
+        wheel_fp: Path = self.get_cache_dir() / self.wheel
 
-        ilog.progress(
-            InstallProgress(
-                package_name=self.name,
-                status='',
-                type='progress',
-                progress=0,
-            )
-        )
         try:
             response = requests.get(
                 self.wheel_url,
@@ -578,16 +602,23 @@ class PyPackage:
                 and wheel_fp.stat().st_size == total_size
             ):
                 ilog.debug(f"Wheel already downloaded.")
-                self.send_end_progress(status='success')
                 self.downloaded = True
                 return True
 
             # Not already downloaded
-            ilog.info(f"Downloading {self.wheel}")
+            ilog.info(f"Downloading {self.wheel} from {self.wheel_url}")
             downloaded = 0
             start_time = time.time()
             last_log_time = start_time
 
+            ilog.progress(
+                InstallProgress(
+                    package_name=self.name,
+                    status='',
+                    type='progress',
+                    progress=0,
+                )
+            )
             with open(wheel_fp, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
                     if chunk:
@@ -641,30 +672,53 @@ class PyPackage:
             wheel_fp.unlink(missing_ok=True)
 
         self.send_end_progress(status='failed')
+        return False
 
 
     def download_wheel(
         self,
         force: bool = False,
-        stall_timeout: float = 30,
+        stall_timeout: float = 10,
         use_pip: bool = False,
+        use_local_rehost: bool = False
     ) -> bool:
+        downloaded: bool = False
+
+        print(self)
+
+        # If no cache, will be downloaded by pip
         if not self.do_cache:
             return True
 
+        # No need to download when in dev mode
         if self.version in ('dev', 'local'):
             return True
 
-        g_backend_dirs.cache.mkdir(parents=True, exist_ok=True)
-        wheel_fp = g_backend_dirs.cache / self.wheel
-        ilog.info(f"Download {self.name} as {wheel_fp}")
+        # If no wheel found or force download with pip
+        wheel_fp = self.get_cache_dir() / self.wheel
+        download_with_pip = not self.wheel_url or use_pip
 
-        if not self.wheel_url or use_pip:
-            return self._download_wheel_with_pip(force=force)
+        # Use local rehost to avoid downloading
+        if use_local_rehost and g_backend_dirs.local_rehost:
+            downloaded = self.download_from_local_rehost()
 
-        return self._download_wheel_with_requests(
-            force=force, stall_timeout=stall_timeout
-        )
+        print(yellow(downloaded))
+        raise
+
+        # Even if cached, if using pip, redownload because we don't know
+        # if the already downloaded file is valid
+        if not downloaded:
+            ilog.info(f"Download {wheel_fp} (use pip: {download_with_pip})")
+            if download_with_pip:
+                downloaded = self._download_wheel_with_pip(force=force)
+
+            else:
+                downloaded = self._download_wheel_with_requests(
+                    force=force, stall_timeout=stall_timeout
+                )
+
+        self.downloaded = downloaded
+        return downloaded
 
 
     def _install_dev(self) -> bool:
@@ -704,20 +758,9 @@ class PyPackage:
         return installed
 
 
-
     def install(self, reinstall: bool = False, recover: bool = False) -> bool:
-        ilog.info(f"{self.name} installing {self.version}")
-
-        # Send progress update
-        ilog.debug(f"Installing {self.name} {self.version}")
-
-        ilog.progress(
-            InstallProgress(
-                package_name=self.name,
-                type='indet',
-                progress=0,
-            )
-        )
+        version = self.version if self.version else self.latest_version
+        ilog.info(f"Installing {self.name}=={version}")
 
         if self.version == 'dev':
             if not self.installed:
@@ -767,7 +810,6 @@ class PyPackage:
                 or "Requirement already satisfied"  in last_line
             ):
                 ilog.debug(f"Successfully installed {self.name}")
-                self.send_end_progress(status='success')
                 return True
 
             else:
@@ -779,6 +821,4 @@ class PyPackage:
         except Exception as e:
             ilog.critical(f"Error installing {self.name}: {str(e)}")
 
-
-        self.send_end_progress(status='failed')
         return False

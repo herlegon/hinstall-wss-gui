@@ -47,15 +47,15 @@ if __name__ == "__main__":
     pprint(python_package)
 
     # Use local rehost
-    g_backend_dirs.local_host = get_rehost_dir()
-    python_package.use_local_host = True
+    g_backend_dirs.local_rehost = get_rehost_dir()
+    python_package.use_local_rehost = True
 
     if not python_package.is_installed():
         ilog.error(f"{python_package.name} is not installed. Installing...")
         installed: bool = download_install_ext_packages(
             packages=python_package,
             reinstall=False,
-            use_local_host=True
+            use_local_rehost=True
         )
         if not python_package.installed:
             ilog.error(f"Error: {python_package.name} not installed")
@@ -176,7 +176,7 @@ if __name__ == "__main__":
             start_time = time.time()
             downloaded = pkg.download_wheel(force=False, use_pip=False)
             elapsed = time.time() - start_time
-            ilog.debug(f"{pkg.name} downloaded in {elapsed:.02f}s")
+            ilog.debug(f"Downloaded {pkg.name} in {elapsed:.02f}s")
 
         pkg.install(force=False)
 
