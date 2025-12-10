@@ -22,7 +22,8 @@ from .backend_dirs import g_backend_dirs, get_local_dev_dir
 from .py_packages_install import (
     generate_backend_env,
 )
-
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "hwss"))
+from api import InstallProgress
 
 @dataclass
 class PyPackage:
@@ -674,15 +675,34 @@ class PyPackage:
         return installed
 
 
+    def send_end_progress(self) -> None:
+        ilog.progress(
+            InstallProgress(
+                package_name=self.name,
+                type='indet',
+                progress=100,
+            )
+        )
+
+
     def install(self, reinstall: bool = False, recover: bool = False) -> bool:
         ilog.info(f"{self.name} installing {self.version}")
 
         # Send progress update
         ilog.info(f"Installing {self.name} {self.version}")
 
+        ilog.progress(
+            InstallProgress(
+                package_name=self.name,
+                type='indet',
+                progress=0,
+            )
+        )
+
         if self.version == 'dev':
             if not self.installed:
                 self.installed = self._install_dev()
+            self.send_end_progress()
             return self.installed
 
         if self.uninstall_before:
@@ -735,9 +755,12 @@ class PyPackage:
 
         except subprocess.CalledProcessError as e:
             ilog.critical(f"Error installing {self.name}: {e.stderr}")
+            self.send_end_progress()
             return False
 
         except Exception as e:
             ilog.critical(f"Error installing {self.name}: {str(e)}")
+            self.send_end_progress()
             return False
 
+        self.send_end_progress()

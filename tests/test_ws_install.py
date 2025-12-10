@@ -43,8 +43,17 @@ from api import (
     ResponseType,
     WssIdentity,
     InstallTask,
+    InstallProgress,
 )
 
+
+LEVEL_MAPPING: dict[str, str] = {
+    'critical': "[C]",
+    'error': "[E]",
+    'warning': "[W]",
+    'info': "[I]",
+    'debug': "[D]",
+}
 
 
 
@@ -156,9 +165,6 @@ class WsInstallClient:
             while self._running and self.ws_cc:
                 msg = await self.ws_cc.recv()
                 data: dict = deserialize(msg)
-
-                # For debug
-                self._on_message(data)
                 self.handle_received_message(data)
 
         except Exception as e:
@@ -193,8 +199,12 @@ class WsInstallClient:
         if event.type == "msg":
             # Handle message event
             # print(orange(event))
-            print(f"handle_event: {event}")
-            pass
+            level = event.payload['type']
+            text = event.payload['text']
+            prefix = (
+                LEVEL_MAPPING.get(level, "[?]")
+            )
+            print(f"{prefix} {text}")
 
         elif event.type == "telemetry":
             # Handle telemetry event
@@ -203,6 +213,12 @@ class WsInstallClient:
         elif event.type == "status":
             # Handle status event
             pass
+
+        elif event.type == "progress":
+            p: InstallProgress = InstallProgress(**event.payload)
+            print(f"{p.task_id} {p.package_name} {p.progress}")
+
+
 
 
     def handle_response(self, response: ResponseMessage) -> None:
@@ -245,7 +261,8 @@ class WsInstallClient:
                     if self.event == 'parsed':
                         self._state = CommandState.INSTALL
                         self.event = ''
-                    await asyncio.sleep(0.5)
+                    else:
+                        await asyncio.sleep(0.5)
 
 
                 elif self._state == CommandState.INSTALL:
