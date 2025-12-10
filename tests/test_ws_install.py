@@ -12,7 +12,7 @@ from websockets import (
     ConnectionClosedError, ConnectionClosedOK,
 )
 
-from hytils import lightcyan, orange, yellow
+from hytils import lightcyan, orange, red, yellow, lightgreen
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from hinstall import (
     ilog,
@@ -44,6 +44,7 @@ from api import (
     WssIdentity,
     InstallTask,
     InstallProgress,
+    InstallTaskResult,
 )
 
 
@@ -80,7 +81,7 @@ class WsInstallClient:
         self._state = CommandState.IDLE
         self._on_message = on_message or self._default_message_handler
         self._loop = None
-        self.event = ''
+        self.task_result: InstallTaskResult = None
 
 
     async def _main(self):
@@ -231,12 +232,8 @@ class WsInstallClient:
             self._last_pong = time.time()
             return
 
-        if response.type != 'install':
-            return
-
-        task_result: dict = response.payload
-        if 'status' in task_result.keys():
-            self.event = task_result['status']
+        if response.type == 'install':
+            self.task_result = InstallTaskResult(**response.payload)
 
         print(response.payload)
 
@@ -246,7 +243,9 @@ class WsInstallClient:
 
     async def state_machine(self):
         """State machine that sends commands in sequence"""
-        self.event = ''
+        self.task_result: InstallTaskResult = None
+        current_stage = 0
+
         while self._running and self.ws_cc:
 
             try:
@@ -256,38 +255,72 @@ class WsInstallClient:
                         **self.install_config
                     }
                     await self.send_task(task)
-                    self.event = ''
+                    self.task_result = None
                     self._state = CommandState.PARSING
 
-
                 elif self._state == CommandState.PARSING:
-                    if self.event == 'parsed':
-                        self._state = CommandState.INSTALL
-                        self.event = ''
-                    else:
+                    if self.task_result is None:
                         await asyncio.sleep(0.5)
+                        continue
 
+                    if self.task_result.task_id != 'parse':
+                        print(red("Error! wrong task_id"))
+
+                    elif self.task_result.status == 'parsed':
+                        self._state = CommandState.INSTALL
+                        self.task_result = None
+
+                    elif self.task_result.status == 'failed':
+                        self._state = CommandState.END
+                        print(red("Failed parsing"))
 
                 elif self._state == CommandState.INSTALL:
                     if not self.stages:
                         self._state = CommandState.END
 
+                    current_stage = self.stages[0]
                     await self.send_task(
-                        InstallTask(stage=self.stages.pop())
+                        InstallTask(stage=current_stage)
                     )
-                    self.event = ''
+                    self.task_result = None
                     self._state = CommandState.INSTALLING
 
-
                 elif self._state == CommandState.INSTALLING:
-                    # print("wait")
-                    await asyncio.sleep(2)
+                    if self.task_result is None:
+                        await asyncio.sleep(2)
+                        continue
 
+                    if self.task_result.task_id != 'install':
+                        print(red("Error! wrong task_id"))
+
+                    elif self.task_result.status == 'installed':
+                        self.stages.pop()
+                        if self.task_result.restart:
+                            self._state = CommandState.RESTART
+                        else:
+                            self._state = CommandState.INSTALL
+                        self.task_result = None
+
+                    elif self.task_result.status == 'failed':
+                        self._state = CommandState.END
+                        print(red("Failed installing"))
+
+                elif self._state == CommandState.RESTART:
+                    await self.send_shutdown_request()
+
+                    # Wait to see if connection is closed by server
+                    try:
+                        await self.ws_cc.wait_closed()
+                        print(lightgreen("Connection closed by server"))
+
+                    except Exception as e:
+                        print(f"Wait closed exception: {e}")
+                        # force kill the subprocess
+                    break
 
                 elif self._state == CommandState.RESTARTING:
                     # Wait for restart to complete
                     await asyncio.sleep(1)
-
 
                 elif self._state == CommandState.ERROR:
                     ilog.info("[STATE] Error state reached, breaking state machine")
@@ -374,16 +407,12 @@ class WsInstallClient:
         )
 
 
-    async def send_restart_request(self):
-        await self._send_message(RequestMessage(type='restart'))
-
-
     async def send_identify_request(self):
         await self._send_message(RequestMessage(type='identify'))
 
 
     async def send_shutdown_request(self):
-        await self._send_message(RequestMessage(type='shutdowns'))
+        await self._send_message(RequestMessage(type='shutdown'))
 
 
 

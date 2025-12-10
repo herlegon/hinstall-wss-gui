@@ -564,7 +564,6 @@ class PyPackage:
 
         # Copy from local rehost to cache
         if local_fp.exists() and self.do_cache:
-            cache_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy(local_fp, cache_dir)
             downloaded = True
 
@@ -579,7 +578,7 @@ class PyPackage:
         force: bool = False,
         stall_timeout: float = 30,
     ) -> bool:
-        ilog.debug(f"{self.name} use requests to download wheel")
+        ilog.debug(f"Use requests to download wheel: {self.name}")
         wheel_fp: Path = self.get_cache_dir() / self.wheel
 
         try:
@@ -692,8 +691,11 @@ class PyPackage:
         if self.version in ('dev', 'local'):
             return True
 
+        cache_dir = self.get_cache_dir()
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
         # If no wheel found or force download with pip
-        wheel_fp = self.get_cache_dir() / self.wheel
+        wheel_fp = cache_dir / self.wheel
         download_with_pip = not self.wheel_url or use_pip
 
         # Use local rehost to avoid downloading
