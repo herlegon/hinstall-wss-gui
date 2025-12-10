@@ -120,9 +120,16 @@ class WsInstallClient:
                         self._heartbeat_loop(),
                         self.state_machine(),
                     )
+                
+                if self._state == CommandState.RESTART:
+                    self._running = False
+                    break
 
             except (ConnectionClosedError, ConnectionClosedOK) as e:
                 ilog.warning(f"[WARNING] WebSocket closed: {e}")
+                if self._state == CommandState.RESTART:
+                    self._running = False
+                    break
                 self._state = CommandState.ERROR
 
             except Exception as e:
