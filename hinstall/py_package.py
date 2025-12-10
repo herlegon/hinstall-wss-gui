@@ -684,8 +684,6 @@ class PyPackage:
     ) -> bool:
         downloaded: bool = False
 
-        print(self)
-
         # If no cache, will be downloaded by pip
         if not self.do_cache:
             return True
@@ -701,9 +699,6 @@ class PyPackage:
         # Use local rehost to avoid downloading
         if use_local_rehost and g_backend_dirs.local_rehost:
             downloaded = self.download_from_local_rehost()
-
-        print(yellow(downloaded))
-        raise
 
         # Even if cached, if using pip, redownload because we don't know
         # if the already downloaded file is valid
@@ -801,7 +796,7 @@ class PyPackage:
             stdout: io.TextIOWrapper = process.stdout
             last_line: str = ""
             for line in stdout:
-                ilog.debug(line.rstrip())
+                ilog.debug(f" pip: {line.rstrip()}")
                 last_line = line
             process.communicate(timeout=10)
 
