@@ -796,7 +796,7 @@ class PyPackage:
             stdout: io.TextIOWrapper = process.stdout
             last_line: str = ""
             for line in stdout:
-                ilog.debug(f" pip: {line.rstrip()}")
+                ilog.debug(f"pip: {line.rstrip()}")
                 last_line = line
             process.communicate(timeout=10)
 
