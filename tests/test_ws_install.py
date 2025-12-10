@@ -216,7 +216,7 @@ class WsInstallClient:
 
         elif event.type == "progress":
             p: InstallProgress = InstallProgress(**event.payload)
-            print(f"{p.task_id} {p.package_name} {p.progress}")
+            print(f"[PROGRESS] {p.task_id} {p.package_name} {p.progress}")
 
 
 
@@ -277,7 +277,7 @@ class WsInstallClient:
 
 
                 elif self._state == CommandState.INSTALLING:
-                    print("wait")
+                    # print("wait")
                     await asyncio.sleep(2)
 
 

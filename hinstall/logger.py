@@ -5,8 +5,11 @@ from typing import Optional
 from hytils import darkgrey, green, yellow, red
 
 
-STATUS_LEVEL = 15
+STATUS_LEVEL = 24
 logging.addLevelName(STATUS_LEVEL, "STATUS")
+
+PROGRESS_LEVEL = 25  # Between INFO (20) and WARNING (30)
+logging.addLevelName(PROGRESS_LEVEL, "PROGRESS")
 
 
 class ColorFormatter(logging.Formatter):
@@ -14,6 +17,7 @@ class ColorFormatter(logging.Formatter):
         logging.DEBUG: darkgrey,
         logging.INFO: green,
         STATUS_LEVEL: lambda x: x,
+        PROGRESS_LEVEL: lambda x: x,
         logging.WARNING: yellow,
         logging.ERROR: red,
         logging.CRITICAL: red,
@@ -24,6 +28,7 @@ class ColorFormatter(logging.Formatter):
         5: "[V]",
         logging.INFO: "[I]",
         STATUS_LEVEL: "",
+        PROGRESS_LEVEL: "",
         logging.WARNING: "[W]",
         logging.ERROR: "[E]",
         logging.CRITICAL: "[C]",
@@ -32,6 +37,10 @@ class ColorFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         level_no: int = record.levelno
         if level_no == STATUS_LEVEL:
+            return record.getMessage()
+
+        # PROGRESS level should not be formatted (handled by handlers)
+        if level_no == PROGRESS_LEVEL:
             return record.getMessage()
 
         color_fn = self.COLORS.get(level_no, lambda x: x)
@@ -56,6 +65,19 @@ class HInstallLogger(logging.Logger):
     def status(self, msg, *args, **kwargs):
         if self.isEnabledFor(STATUS_LEVEL):
             self._log(STATUS_LEVEL, msg, args, **kwargs)
+
+    def progress(self, progress_data, *args, **kwargs):
+        """Log a progress update at PROGRESS level"""
+        if self.isEnabledFor(PROGRESS_LEVEL):
+            # Create a log record with the progress data attached
+            record = self.makeRecord(
+                self.name, PROGRESS_LEVEL, "(progress)", 0,
+                f"Progress: {getattr(progress_data, 'package_name', 'unknown')}",
+                args, None, **kwargs
+            )
+            # Attach the progress data for handlers to use
+            record.progress_data = progress_data
+            self.handle(record)
 
 
 logging.setLoggerClass(HInstallLogger)

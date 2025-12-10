@@ -173,21 +173,11 @@ if __name__ == "__main__":
             pkg.do_cache = True
 
         if do_download and pkg.do_cache:
-            # print(f"{lightcyan(pkg.name)} {'do cache' if pkg.do_cache else ''}")
-
-            # start_time = time.time()
-            # downloaded = pkg.download_wheel(force=False, use_pip=True)
-            # elapsed = time.time() - start_time
-            # ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
-
-            # print(lightcyan("-" * 80))
             start_time = time.time()
             downloaded = pkg.download_wheel(force=False, use_pip=False)
             elapsed = time.time() - start_time
-            ilog.info(f"{pkg.name} downloaded in {elapsed:.02f}s")
-            print(lightcyan("-" * 80))
+            ilog.debug(f"{pkg.name} downloaded in {elapsed:.02f}s")
 
-        # pprint(pkg)
         pkg.install(force=False)
 
 

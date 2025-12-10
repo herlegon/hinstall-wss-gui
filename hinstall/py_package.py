@@ -458,6 +458,26 @@ class PyPackage:
                 return
 
 
+    def send_end_progress(self, status: Literal['success', 'failed']) -> None:
+        # Whatever the type, it will
+        ilog.progress(
+            InstallProgress(
+                package_name=self.name,
+                status=status,
+                type='indet',
+                progress=100,
+            )
+        )
+
+    def send_update_progress(self, progress: float) -> None:
+        ilog.progress(
+            InstallProgress(
+                package_name=self.name,
+                progress=progress,
+            )
+        )
+
+
     def _download_wheel_with_pip(self, force: bool = False) -> bool:
         ilog.debug(f"{self.name} use pip to download wheel")
         python_exe = str(g_backend_dirs.python_exe)
@@ -491,20 +511,19 @@ class PyPackage:
             # Check if 'Successfully installed' is in the output
             if "Successfully downloaded" in result.stdout.splitlines()[-1]:
                 ilog.info(f"{self.name} successfully downloaded")
+                self.send_end_progress(status='success')
                 return True
 
             else:
-                ilog.critical(f"{self.name} download failed: {result.stdout}")
-                return False
+                ilog.error(f"{self.name} download failed: {result.stdout}")
 
         except subprocess.CalledProcessError as e:
             ilog.critical(f"{self.name} failed to downloaded package {e.stderr}")
-            return False
 
         except Exception as e:
             ilog.critical(f"{self.name} download encountered an error: {str(e)}")
-            return False
 
+        self.send_end_progress(status='failed')
         return False
 
 
@@ -531,6 +550,14 @@ class PyPackage:
         cache_dir.mkdir(parents=True, exist_ok=True)
         wheel_fp: Path = cache_dir / self.wheel
 
+        ilog.progress(
+            InstallProgress(
+                package_name=self.name,
+                status='',
+                type='progress',
+                progress=0,
+            )
+        )
         try:
             response = requests.get(
                 self.wheel_url,
@@ -550,10 +577,12 @@ class PyPackage:
                 and wheel_fp.is_file()
                 and wheel_fp.stat().st_size == total_size
             ):
-                ilog.info(f"File was already downloaded for package {self.name}")
+                ilog.debug(f"Wheel already downloaded.")
+                self.send_end_progress(status='success')
                 self.downloaded = True
                 return True
 
+            # Not already downloaded
             ilog.info(f"Downloading {self.wheel}")
             downloaded = 0
             start_time = time.time()
@@ -586,7 +615,7 @@ class PyPackage:
                                 eta_str = "calculating..."
 
                             ilog.debug(f"Downloaded {size_mb:.1f}/{total_mb:.1f} MB | {speed_mbps:.1f} MB/s | ETA: {eta_str}")
-                            ilog.status(f"[pg]{percentage}")
+                            self.send_update_progress(progress=percentage)
                             last_log_time = current_time
 
                 else:
@@ -599,19 +628,19 @@ class PyPackage:
             elapsed = time.time() - start_time
             speed_mbps = (downloaded / (1024**2)) / elapsed if elapsed > 0 else 0
             ilog.info(f"Downloaded {self.wheel} ({downloaded / (1024**2):.1f} MB in {self.format_time(elapsed)} at {speed_mbps:.1f} MB/s)")
-
+            self.send_end_progress(status='success')
             return True
 
         except requests.exceptions.RequestException as e:
             ilog.error(f"Download failed: {str(e)}")
             # Clean up partial file
             wheel_fp.unlink(missing_ok=True)
-            return False
 
         except Exception as e:
             ilog.critical(f"Unexpected error downloading {self.wheel}: {str(e)}")
             wheel_fp.unlink(missing_ok=True)
-            return False
+
+        self.send_end_progress(status='failed')
 
 
     def download_wheel(
@@ -675,21 +704,12 @@ class PyPackage:
         return installed
 
 
-    def send_end_progress(self) -> None:
-        ilog.progress(
-            InstallProgress(
-                package_name=self.name,
-                type='indet',
-                progress=100,
-            )
-        )
-
 
     def install(self, reinstall: bool = False, recover: bool = False) -> bool:
         ilog.info(f"{self.name} installing {self.version}")
 
         # Send progress update
-        ilog.info(f"Installing {self.name} {self.version}")
+        ilog.debug(f"Installing {self.name} {self.version}")
 
         ilog.progress(
             InstallProgress(
@@ -702,7 +722,7 @@ class PyPackage:
         if self.version == 'dev':
             if not self.installed:
                 self.installed = self._install_dev()
-            self.send_end_progress()
+            self.send_end_progress(status='success' if self.installed else 'failed')
             return self.installed
 
         if self.uninstall_before:
@@ -723,7 +743,7 @@ class PyPackage:
             cmd = f"{cmd} --force-reinstall --ignore-installed"
 
 
-        ilog.debug(yellow(cmd))
+        ilog.debug(cmd)
 
         env = generate_backend_env(exclude_append=['proxy',])
         try:
@@ -746,21 +766,19 @@ class PyPackage:
                 "Successfully installed" in last_line
                 or "Requirement already satisfied"  in last_line
             ):
-                ilog.info(f"Successfully installed {self.name}")
+                ilog.debug(f"Successfully installed {self.name}")
+                self.send_end_progress(status='success')
                 return True
 
             else:
                 ilog.critical(f"Failed to install {self.name}")
-                return False
 
         except subprocess.CalledProcessError as e:
             ilog.critical(f"Error installing {self.name}: {e.stderr}")
-            self.send_end_progress()
-            return False
 
         except Exception as e:
             ilog.critical(f"Error installing {self.name}: {str(e)}")
-            self.send_end_progress()
-            return False
 
-        self.send_end_progress()
+
+        self.send_end_progress(status='failed')
+        return False
