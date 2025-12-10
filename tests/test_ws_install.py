@@ -275,10 +275,12 @@ class WsInstallClient:
                         print(red("Failed parsing"))
 
                 elif self._state == CommandState.INSTALL:
+                    print(self.stages)
                     if not self.stages:
                         self._state = CommandState.END
 
                     current_stage = self.stages[0]
+                    print(f"current_stage: {current_stage}")
                     await self.send_task(
                         InstallTask(stage=current_stage)
                     )
@@ -287,18 +289,22 @@ class WsInstallClient:
 
                 elif self._state == CommandState.INSTALLING:
                     if self.task_result is None:
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(0.5)
                         continue
 
                     if self.task_result.task_id != 'install':
                         print(red("Error! wrong task_id"))
 
                     elif self.task_result.status == 'installed':
-                        self.stages.pop()
+                        print(f"installed stage {current_stage}")
+                        self.stages.pop(0)
                         if self.task_result.restart:
                             self._state = CommandState.RESTART
-                        else:
+                        elif self.stages:
+                            print("next stage")
                             self._state = CommandState.INSTALL
+                        else:
+                            self._state = CommandState.END
                         self.task_result = None
 
                     elif self.task_result.status == 'failed':
@@ -329,6 +335,9 @@ class WsInstallClient:
                 elif self._state == CommandState.FETCH_BACKEND_DETAILS:
                     break
 
+                elif self._state == CommandState.END:
+                    print(red("ended"))
+                    break
 
                 else:
                     await asyncio.sleep(2)
@@ -469,7 +478,7 @@ async def main():
     client = WsInstallClient(
         uri,
         install_config=install_config,
-        stages=1,
+        stages=[1, 2],
     )
 
     try:

@@ -57,6 +57,8 @@ pypi = [
     "pillow",
     "hytils==dev",
     "hsys==dev",
+    "hinstall==dev",
+
 #     "backend",
 #     "pynnlib",
 

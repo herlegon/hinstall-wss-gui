@@ -484,6 +484,15 @@ class PyPackage:
 
     def _download_wheel_with_pip(self, force: bool = False) -> bool:
         ilog.debug(f"{self.name} use pip to download wheel")
+        ilog.progress(
+            InstallProgress(
+                package_name=self.name,
+                status='',
+                type='indet',
+                progress=0,
+            )
+        )
+
         python_exe = str(g_backend_dirs.python_exe)
         cache_dir: Path = g_backend_dirs.cache
         cache_dir.mkdir(parents=True, exist_ok=True)
