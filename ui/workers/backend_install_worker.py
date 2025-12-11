@@ -106,7 +106,7 @@ class BackendInstallWorker(QThread):
                 backend_env['PATH'] + f"{sep}{backend_script_fp.parent}"
             )
 
-        if True:
+        if False:
             ilog.debug(f"Backend environment:")
             for k, v in backend_env.items():
                 v: str
@@ -126,92 +126,130 @@ class BackendInstallWorker(QThread):
         )
 
 
-    async def _async_run(self, server_ip: str, backend_script_fp: Path, handler):
-        """Run all async operations in a single event loop"""
-        remaining_stages = [1, 2]
-        
-        while True:
-            # Port detection
-            found_port = await self._get_free_port_async(server_ip)
-            if found_port is None:
-                ilog.removeHandler(handler)
-                ilog.critical(f"Another installation is on going or port is used by another process.")
-                self.task_name.emit("Failed to start backend.")
-                self.finished.emit(False, [])
-                return
+    async def start_backend_subprocess(
+        self,
+        backend_script_fp: Path,
+        port: int,
+    ) -> bool:
+        started: bool = False
+        self.threads: list[threading.Thread] = []
+        self._backend_process = None
 
-            self.process = None
-            self.client = None
+        self.process = None
+        cmd = [
+            str(g_backend_dirs.python_exe),
+            "-u",
+            backend_script_fp,
+            "--port",
+            str(port)
+        ]
+        ilog.info(f"Starting backend: {cmd}")
 
-            cmd = [
-                str(g_backend_dirs.python_exe),
-                "-u",
-                backend_script_fp,
-                "--port",
-                str(found_port)
+        try:
+            self._backend_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=1,
+                universal_newlines=True,
+                start_new_session=False,
+            )
+
+            # Wait until backend prints "READY"
+            for line in iter(self._backend_process.stdout.readline, ""):
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                if "READY" in line:
+                    ilog.info("The backend server is ready to work")
+                    self._last_pong = time.time()
+                    self._is_server_ready = True
+                    break
+
+            # Forward stdout
+            def forward(stream, target):
+                for line in iter(stream.readline, ""):
+                    target.write(f"[std] {line}")
+                    target.flush()
+                    line = line.rstrip()
+                stream.close()
+
+            self.threads = [
+                threading.Thread(
+                    target=forward, args=(self._backend_process.stdout, sys.stdout)
+                ),
+                threading.Thread(
+                    target=forward, args=(self._backend_process.stderr, sys.stderr)
+                ),
             ]
-            ilog.info(f"Starting backend: {cmd}")
+            ilog.info(f"Backend server is running")
+            for t in self.threads:
+                t.start()
+
+        except Exception as e:
+            started = False
+
+        return started
+
+
+
+    async def _async_run(
+        self,
+        server_ip: str,
+        backend_script_fp: Path,
+        logging_handler: logging.Handler,
+        stages: int | list[int] = 1
+    ):
+        """Run all async operations in a single event loop
+        stages must be 1, 2 or [1, 2]
+        - installer gui:
+            * shutdown after stage 1 even if already installed because we need to change page
+                don't try to restart the server, it will be done on next page
+            * shutdown after stage 2 because we will need to start the application server
+            * but retry if failed
+        - splash: automatically run both stages if asking to be up-to-date or 1st time
+        """
+        # When
+        remaining_stages = stages
+
+        # Port detection
+        port = await self._get_free_port_async(server_ip)
+        if port is None:
+            ilog.critical(f"Another installation is on going or port is used by another process.")
+            self.task_name.emit("Cannot start backend.")
+            self.finished.emit(False, [])
+            ilog.removeHandler(logging_handler)
+            return
+
+        # Use a loop
+        retry_max_count: bool = 2
+        while True:
+            self.client = None
+            devmode: bool = self.user_settings.get('devmode', False)
 
             try:
-                self._backend_process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    bufsize=1,
-                    universal_newlines=True,
-                    start_new_session=False,
+                started: bool = self.start_backend_subprocess(
+                    backend_script_fp=backend_script_fp, port=port,
                 )
 
-                # Wait until backend prints "READY"
-                for line in iter(self._backend_process.stdout.readline, ""):
-                    sys.stdout.write(line)
-                    sys.stdout.flush()
-                    if "READY" in line:
-                        ilog.info("The backend server is ready to work")
-                        self._last_pong = time.time()
-                        self._is_server_ready = True
-                        break
-
-                # Forward stdout
-                def forward(stream, target):
-                    for line in iter(stream.readline, ""):
-                        target.write(f"[std] {line}")
-                        target.flush()
-                        line = line.rstrip()
-                    stream.close()
-
-                threads = [
-                    threading.Thread(
-                        target=forward, args=(self._backend_process.stdout, sys.stdout)
-                    ),
-                    threading.Thread(
-                        target=forward, args=(self._backend_process.stderr, sys.stderr)
-                    ),
-                ]
-                ilog.info(f"Backend server is running")
-                for t in threads:
-                    t.start()
+                if not started:
+                    break
 
                 # backend has to install its own external packages if not local
                 is_local_backend = (
                     self.user_settings.get('server_ip', '127.0.0.1') in ('localhost', '127.0.0.1')
                 )
-                # Use a local host only if dev and local
-                use_local_rehost = (
-                    self.user_settings.get('devmode', False) and is_local_backend
-                )
 
-                # Send this config ans selection to backend.
+                # Send this config and selection to backend.
                 install_config = {
                     'cfg': json.dumps(self.app_cfg),
                     'local_backend': is_local_backend,
                     'reinstall': False,
-                    'use_local_rehost': use_local_rehost,
+                    'use_local_rehost': devmode and is_local_backend,
                     'local_rehost': ""
                 }
 
                 # Start the client in the same event loop
-                uri = f"ws://{server_ip}:{found_port}"
+                uri = f"ws://{server_ip}:{port}"
                 self.client = WsInstallClient(
                     uri,
                     install_config=install_config,
@@ -219,32 +257,41 @@ class BackendInstallWorker(QThread):
                 )
                 await self.client.start()
 
-                # wait for the end
-                for t in threads:
+                # wait for the end of the std thread
+                for t in self.threads:
                     t.join()
 
                 return_code = self._backend_process.wait()
                 ilog.info(f"Backend exited with code {return_code}")
 
-                # Check if restart was requested
-                if self.client and self.client._state == CommandState.RESTART:
-                    ilog.info("Restart requested. Restarting backend loop...")
-                    remaining_stages = self.client.stages
-                    self._backend_process = None
-                    await asyncio.sleep(2.0)
-                    continue
+                # Check if restart was requested:
+                #   restart asked
+                #   and failed
+                if self.client:
+                    if self.client.restart_requested():
+                        self._backend_process = None
+                        if self.client.retry() and retry_max_count:
+                            ilog.info("Restart requested. Reason: retry")
+                        else:
+                            ilog.info("Restart requested. Restarting backend loop...")
+                        self._backend_process = None
 
-            finally:
-                if self._backend_process:
-                     if self._backend_process.poll() is None:
-                         self._backend_process.terminate()
-                         self._backend_process.wait()
-                self._backend_process = None
+                    else:
+                        ilog.info("Shutdown")
+                        break
 
-            break
+            except Exception as e:
+                ilog.exception(f"{str(e)}")
+                break
+
+        if self._backend_process:
+            if self._backend_process.poll() is None:
+                self._backend_process.terminate()
+                self._backend_process.wait()
+        self._backend_process = None
 
         ilog.info("Finished the installation of the backend server")
-        ilog.removeHandler(handler)
+        ilog.removeHandler(logging_handler)
 
 
     async def _get_free_port_async(self, server_ip: str) -> int | None:
@@ -257,7 +304,7 @@ class BackendInstallWorker(QThread):
 
             if status == "WS_SERVER":
                 ilog.info(f"Found existing Installation on going on port {port}.")
-                return None
+                break
 
             elif status == 'terminated':
                 # Verify that it is really free
@@ -277,7 +324,7 @@ class BackendInstallWorker(QThread):
                     ilog.error(f"Port {port} failed verification after 3 attempts.")
                     self.task_name.emit("Failed to verify port availability.")
                     self.finished.emit(False, [])
-                    return None
+                    break
 
             elif status == 'free':
                 found_port = port

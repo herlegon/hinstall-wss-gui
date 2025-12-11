@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>227</width>
+    <width>236</width>
     <height>205</height>
    </rect>
   </property>
@@ -88,7 +88,7 @@
      <item>
       <widget class="QProgressBar" name="progress_bar">
        <property name="value">
-        <number>24</number>
+        <number>0</number>
        </property>
       </widget>
      </item>

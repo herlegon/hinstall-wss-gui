@@ -67,7 +67,7 @@ class Ui_WelcomeWidget(object):
     def setupUi(self, WelcomeWidget, theme: Type[Theme]):
         if not WelcomeWidget.objectName():
             WelcomeWidget.setObjectName(u"WelcomeWidget")
-        WelcomeWidget.resize(562, 316)
+        WelcomeWidget.resize(695, 337)
         self.main_layout = QVBoxLayout(WelcomeWidget)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")

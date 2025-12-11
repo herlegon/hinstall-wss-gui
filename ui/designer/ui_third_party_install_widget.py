@@ -66,7 +66,7 @@ class Ui_ThirdPartiesInstall(object):
     def setupUi(self, ThirdPartiesInstall, theme: Type[Theme]):
         if not ThirdPartiesInstall.objectName():
             ThirdPartiesInstall.setObjectName(u"ThirdPartiesInstall")
-        ThirdPartiesInstall.resize(288, 228)
+        ThirdPartiesInstall.resize(334, 228)
         self.main_layout = QVBoxLayout(ThirdPartiesInstall)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -105,7 +105,7 @@ class Ui_ThirdPartiesInstall(object):
 
         self.progress_bar = HProgressBar(ThirdPartiesInstall, theme=theme)
         self.progress_bar.setObjectName(u"progress_bar")
-        self.progress_bar.setValue(24)
+        self.progress_bar.setValue(0)
 
         self.verticalLayout_2.addWidget(self.progress_bar)
 

@@ -17,22 +17,24 @@ if __name__ == "__main__":
 
     # 1. Determine the shell and arguments
     if sys.platform == "win32":
-        shell = os.environ.get("COMSPEC", "cmd.exe")
-        clear_conda = (
-            'set "CONDA_EXE=" & '
-            'set "CONDA_EXES=" & '
-            'set "CONDA_SHLVL=" & '
-            'set "CONDA_PREFIX=" & '
-            'set "CONDA_DEFAULT_ENV=" & '
-            'set "CONDA_PROMPT_MODIFIER=" & '
-            'set "_CE_CONDA=" & '
-            'set "_CE_M=" & '
-            'cls'
-        )
+        # shell = os.environ.get("COMSPEC", "cmd.exe")
+        # clear_conda = (
+        #     'set "CONDA_EXE=" & '
+        #     'set "CONDA_EXES=" & '
+        #     'set "CONDA_SHLVL=" & '
+        #     'set "CONDA_PREFIX=" & '
+        #     'set "CONDA_DEFAULT_ENV=" & '
+        #     'set "CONDA_PROMPT_MODIFIER=" & '
+        #     'set "_CE_CONDA=" & '
+        #     'set "_CE_M=" & '
+        #     'cls'
+        # )
 
         print(f"--- Launching standalone terminal ({shell}) ---")
+        # cmd = [shell, "/D", "/K", clear_conda]
+        cmd = [shell, "-NoExit", "-Command", "Clear-Host"]
         subprocess.run(
-            [shell, "/D", "/K", clear_conda],
+            cmd,
             env=backend_env,
             stdin=sys.stdin,
             stdout=sys.stdout,
@@ -41,10 +43,8 @@ if __name__ == "__main__":
     else:
         # Linux/Mac: Use os.execvpe for full process replacement (best method)
         shell = os.environ.get("SHELL", "/bin/bash")
-
-        # Add the -i (interactive) flag to the arguments
-        # The first argument in the list is always the program name (usually the shell path itself)
-        args = [shell, "--login", "--norc", "--noprofile"]
+        # args = [shell, "--login", "--norc", "--noprofile"]
+        args = [shell]
 
         print(f"--- Replacing Python process with standalone terminal ({shell}) ---")
 

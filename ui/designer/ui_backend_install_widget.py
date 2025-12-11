@@ -66,7 +66,7 @@ class Ui_BackendWidget(object):
     def setupUi(self, BackendWidget, theme: Type[Theme]):
         if not BackendWidget.objectName():
             BackendWidget.setObjectName(u"BackendWidget")
-        BackendWidget.resize(227, 205)
+        BackendWidget.resize(236, 205)
         self.main_layout = QVBoxLayout(BackendWidget)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -107,7 +107,7 @@ class Ui_BackendWidget(object):
 
         self.progress_bar = HProgressBar(BackendWidget, theme=theme)
         self.progress_bar.setObjectName(u"progress_bar")
-        self.progress_bar.setValue(24)
+        self.progress_bar.setValue(0)
 
         self.verticalLayout_2.addWidget(self.progress_bar)
 

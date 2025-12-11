@@ -126,7 +126,7 @@ class Ui_AiResourceInstallWidget(object):
 
         self.progress_bar = HProgressBar(AiResourceInstallWidget, theme=theme)
         self.progress_bar.setObjectName(u"progress_bar")
-        self.progress_bar.setValue(24)
+        self.progress_bar.setValue(0)
 
         self.verticalLayout_2.addWidget(self.progress_bar)
 
