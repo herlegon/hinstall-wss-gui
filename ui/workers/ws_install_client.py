@@ -41,7 +41,6 @@ class CommandState(Enum):
     RESTART = 'restart'
     SHUTDOWN = 'shutdown'
     FETCHING_BACKEND_DETAILS = 'fetching_backend_details'
-    END = 'end'
     ENDED = 'ended'
     CRITICAL = 'error'
 
@@ -79,7 +78,8 @@ class WsInstallClient:
         uri: str,
         install_config: dict,
         stages: int | list[int],
-        on_message: Optional[Callable] = None
+        on_message: Optional[Callable] = None,
+        devmode: bool = False,
     ):
         # Stages from 0 to 2
         #   0: external packages
@@ -99,6 +99,7 @@ class WsInstallClient:
         self._on_message = on_message or self._default_message_handler
         self._loop = None
         self.task_result: InstallTaskResult = None
+        self.devmode = devmode
 
 
     def retry(self) -> bool:
@@ -164,7 +165,7 @@ class WsInstallClient:
         self.wss_running = False
         self.ws_cc = None
         msg = f" with error: {exception}" if exception else ""
-        ilog.info(f"[INFO] Connection loop terminated{msg}")
+        ilog.info(f"[INFO] Connection loop terminated, {msg}")
 
 
     async def start(self):
@@ -201,7 +202,8 @@ class WsInstallClient:
                 self.handle_received_message(data)
 
         except Exception as e:
-            ilog.error(f"[ERROR] Receive loop error: {e}")
+            if self.wss_running:
+                ilog.error(f"[ERROR] Receive loop error: {e}")
 
 
     def handle_received_message(self, data: dict):
@@ -262,8 +264,13 @@ class WsInstallClient:
 
         if response.type == 'install':
             self.task_result = InstallTaskResult(**response.payload)
+            return
 
-        print(response.payload)
+        if response.type == 'shutdown':
+            self.wss_running = False
+            return
+
+        print(f"handle_response: {response}")
 
 
     async def _send_message(self, message: RequestMessage | str):
@@ -334,11 +341,11 @@ class WsInstallClient:
 
 
     async def _state_parsing(self) -> None:
-        # Wait for end of parsing and set new state
-
+        # Wait for end of parsing
         if self.task_result is None:
             await asyncio.sleep(0.5)
 
+        # Task is finished
         if self.task_result.task_id != 'parse':
             print(red("Error! wrong task_id"))
 
@@ -392,28 +399,29 @@ class WsInstallClient:
                 print("next stage")
                 self.state = CommandState.INSTALL
             else:
-                self.state = CommandState.END
+                self.state = CommandState.SHUTDOWN
             self.task_result = None
 
         elif self.task_result.status == 'failed':
             self._retry = True
-            self.state = CommandState.END
+            self.state = CommandState.RESTART
             print(red("Failed installing"))
 
 
     async def _state_shutdown(self) -> None:
-        await self.send_shutdown_request()
+        self.wss_running
+        if not self.devmode:
+            await self.send_shutdown_request()
 
-        # Wait to see if connection is closed by server
-        try:
-            await self.ws_cc.wait_closed()
-            print(lightgreen("Connection closed by server"))
+            # Wait to see if connection is closed by server
+            try:
+                await self.ws_cc.wait_closed()
+                print(lightgreen("Connection closed by server"))
 
-        except Exception as e:
-            print(f"Wait closed exception: {e}")
+            except Exception as e:
+                print(f"Wait closed exception: {e}")
 
         self.state = CommandState.ENDED
-        self.wss_running = False
 
 
     async def _state_restart(self) -> None:
@@ -439,30 +447,33 @@ class WsInstallClient:
         await asyncio.sleep(0)
 
 
-
     async def state_machine(self):
         """State machine that sends commands in sequence"""
         self.task_result: InstallTaskResult = None
 
         state_map: dict[CommandState, Callable] = {
-            CommandState.IDLE:  self._state_idle(),
-            CommandState.PARSING:  self._state_parsing(),
-            CommandState.FETCH_SYS_INFO: self._state_fetch_sysinfo(),
-            CommandState.FETCHING_SYS_INFO: self._state_fetching_sysinfo(),
-            CommandState.INSTALL:  self._state_install(),
-            CommandState.INSTALLING: self._state_installing(),
-            CommandState.RESTART: self._state_restart(),
-            CommandState.CRITICAL:self._state_critical(),
-            CommandState.SHUTDOWN:self._state_shutdown(),
-            CommandState.ENDED: self._state_ended(),
+            CommandState.IDLE: self._state_idle,
+            CommandState.PARSING: self._state_parsing,
+            CommandState.FETCH_SYS_INFO: self._state_fetch_sysinfo,
+            CommandState.FETCHING_SYS_INFO: self._state_fetching_sysinfo,
+            CommandState.INSTALL: self._state_install,
+            CommandState.INSTALLING: self._state_installing,
+            CommandState.RESTART: self._state_restart,
+            CommandState.CRITICAL:self._state_critical,
+            CommandState.SHUTDOWN:self._state_shutdown,
+            CommandState.ENDED: self._state_ended,
         }
 
         while self.wss_running and self.ws_cc:
             try:
-                state_map.get(self.state, lambda: self._state_unknown())()
+                await state_map.get(self.state, lambda: self._state_unknown())()
+                await asyncio.sleep(0.2)
+                print(CommandState(self.state))
 
             except Exception as e:
                 ilog.error(f"[ERROR] State machine error at state {CommandState(self.state)}: {e}")
                 await self._state_shutdown()
                 break
 
+        self.wss_running = False
+        print("end of the state machine")

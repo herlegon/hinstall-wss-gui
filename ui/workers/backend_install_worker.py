@@ -22,7 +22,7 @@ from hinstall import (
     get_python_version,
     ilog,
 )
-from hytils import yellow
+from hytils import lightcyan, yellow
 from .ws_install_client import (
     RequestMessage, ResponseMessage, WsInstallClient, deserialize, serialize, WssIdentity,
     CommandState
@@ -208,28 +208,34 @@ class BackendInstallWorker(QThread):
             * but retry if failed
         - splash: automatically run both stages if asking to be up-to-date or 1st time
         """
-        # When
         remaining_stages = stages
+        devmode: bool = self.user_settings.get('devmode', False)
 
-        # Port detection
-        port = await self._get_free_port_async(server_ip)
-        if port is None:
-            ilog.critical(f"Another installation is on going or port is used by another process.")
-            self.task_name.emit("Cannot start backend.")
-            self.finished.emit(False, [])
-            ilog.removeHandler(logging_handler)
-            return
+        # Port detection, not need when in dev mode because it's started by the user
+        if devmode:
+            port = 49990
+        else:
+            port = await self._get_free_port_async(server_ip)
+            if port is None:
+                ilog.critical(f"Another installation is on going or port is used by another process.")
+                self.task_name.emit("Cannot start backend.")
+                self.finished.emit(False, [])
+                ilog.removeHandler(logging_handler)
+                return
 
         # Use a loop
         retry_max_count: bool = 2
         while True:
             self.client = None
-            devmode: bool = self.user_settings.get('devmode', False)
+            self.threads: list[threading.Thread] =  []
 
             try:
-                started: bool = self.start_backend_subprocess(
-                    backend_script_fp=backend_script_fp, port=port,
-                )
+                if devmode:
+                    started = True
+                else:
+                    started: bool = await self.start_backend_subprocess(
+                        backend_script_fp=backend_script_fp, port=port,
+                    )
 
                 if not started:
                     break
@@ -254,6 +260,7 @@ class BackendInstallWorker(QThread):
                     uri,
                     install_config=install_config,
                     stages=remaining_stages,
+                    devmode=devmode,
                 )
                 await self.client.start()
 
@@ -261,8 +268,9 @@ class BackendInstallWorker(QThread):
                 for t in self.threads:
                     t.join()
 
-                return_code = self._backend_process.wait()
-                ilog.info(f"Backend exited with code {return_code}")
+                if self._backend_process and not devmode:
+                    return_code = self._backend_process.wait()
+                    ilog.info(f"Backend exited with code {return_code}")
 
                 # Check if restart was requested:
                 #   restart asked
@@ -288,10 +296,12 @@ class BackendInstallWorker(QThread):
             if self._backend_process.poll() is None:
                 self._backend_process.terminate()
                 self._backend_process.wait()
-        self._backend_process = None
 
-        ilog.info("Finished the installation of the backend server")
+        elif not devmode:
+            ilog.info("End of the installation with error")
+
         ilog.removeHandler(logging_handler)
+        print(lightcyan("BackendInstallWorker: ended"))
 
 
     async def _get_free_port_async(self, server_ip: str) -> int | None:
@@ -299,7 +309,7 @@ class BackendInstallWorker(QThread):
         found_port = None
 
         # Check ports
-        for port in range(49990, 49991):
+        for port in range(49990, 49992):
             status = await self.probe_port(server_ip, port)
 
             if status == "WS_SERVER":
@@ -428,22 +438,18 @@ class BackendInstallWorker(QThread):
 
 
 
-    def stop(self):
-        """Gracefully stop the worker and all subprocesses"""
-        ilog.info("Stopping BackendInstallWorker...")
-        if self.client:
-            self.client.stop()
+    # def stop(self):
+    #     """Gracefully stop the worker and all subprocesses"""
+    #     ilog.info("Stopping BackendInstallWorker...")
+    #     if self.client:
+    #         self.client.stop()
 
-        # If client loop is running, stop() might not be enough if it's stuck on I/O
-        # We rely on client.stop() triggering shutdown logic.
+    #     # If client loop is running, stop() might not be enough if it's stuck on I/O
+    #     # We rely on client.stop() triggering shutdown logic.
 
-        if self.process and self.process.poll() is None:
-             self.process.terminate()
+    #     if self.process and self.process.poll() is None:
+    #          self.process.terminate()
 
-        self.quit()
-        self.wait()
+    #     self.quit()
+    #     self.wait()
 
-
-
-    def handle_log_message(self, msg: str):
-        pass
