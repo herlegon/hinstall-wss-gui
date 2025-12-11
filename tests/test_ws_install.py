@@ -89,7 +89,7 @@ class WsInstallClient:
         delay = 0.5
         exception: str = ""
 
-        ilog.info(f"[INFO] Connecting to {self._uri}")
+        ilog.info(f"Connecting to {self._uri}")
 
         while self._running:
             try:
@@ -101,7 +101,7 @@ class WsInstallClient:
                 ) as ws:
                     retries = 0
                     self.ws_cc = ws
-                    ilog.info("[INFO] Connected to backend")
+                    ilog.info("Connected to backend")
                     self._state = CommandState.IDLE
 
                     await asyncio.gather(
@@ -132,7 +132,7 @@ class WsInstallClient:
         self._running = False
         self.ws_cc = None
         msg = f" with error: {exception}" if exception else ""
-        ilog.info(f"[INFO] Connection loop terminated{msg}")
+        ilog.info(f"Connection loop terminated{msg}")
 
 
     async def start(self):
@@ -484,7 +484,7 @@ async def main():
     try:
         await client.start()
     except KeyboardInterrupt:
-        print("[INFO] Shutting down...")
+        print("Shutting down...")
         client.stop()
 
 

@@ -78,13 +78,13 @@
     </layout>
    </item>
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout_2">
+    <layout class="QVBoxLayout" name="progress_layout">
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
         <widget class="QLabel" name="label">
          <property name="text">
-          <string>Downloading</string>
+          <string>Installing AI Computational Resources...</string>
          </property>
         </widget>
        </item>

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>334</width>
-    <height>228</height>
+    <width>407</width>
+    <height>175</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -53,7 +53,7 @@
        <item>
         <widget class="QLabel" name="indicator_step">
          <property name="text">
-          <string>Downloading FFmpeg</string>
+          <string>Download and installing third parties software...</string>
          </property>
         </widget>
        </item>

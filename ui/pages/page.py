@@ -73,31 +73,24 @@ class Page(QWidget, metaclass=QWidgetABCMeta):
     def showEvent(self, event):
         """Called when the page becomes visible."""
         # Schedule a check for progress bars after the widget is fully initialized
-        print(red("showEvent"))
         if self._has_progress_bar is None:
-            print("repost init")
             self._has_progress_bar = self.has_progress_bar()
             self.reset_progress_bars()
 
         elif not self._installation_started:
-            print("not started: _installation_started")
             self.reset_progress_bars()
 
         super().showEvent(event)
-        print(f"showEvent: {self.__class__.__name__}: {self._has_progress_bar}, {self._installation_started}")
-
 
         # Start installation only once when page is shown
         if self._has_progress_bar and not self._installation_started:
-            print(f"Scheduling installation start for {self.__class__.__name__}")
             self._installation_started = True
             # Use QTimer to ensure UI is fully rendered
-            QTimer.singleShot(100, self._start_installation_if_exists)
+            QTimer.singleShot(10, self._start_installation_if_exists)
 
 
     def _start_installation_if_exists(self):
         """Call start_installation if it exists."""
-        print(red("_start_installation_if_exists"))
         if hasattr(self, 'start_installation') and callable(self.start_installation):
             self.start_installation()
 

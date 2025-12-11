@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>236</width>
-    <height>205</height>
+    <width>313</width>
+    <height>235</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -50,7 +50,7 @@
     </widget>
    </item>
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout_2">
+    <layout class="QVBoxLayout" name="progress_layout">
      <property name="topMargin">
       <number>30</number>
      </property>
@@ -59,7 +59,7 @@
        <item>
         <widget class="QLabel" name="indicator_step">
          <property name="text">
-          <string>Downloading</string>
+          <string>Installing backend...</string>
          </property>
         </widget>
        </item>

@@ -66,7 +66,7 @@ class Ui_BackendWidget(object):
     def setupUi(self, BackendWidget, theme: Type[Theme]):
         if not BackendWidget.objectName():
             BackendWidget.setObjectName(u"BackendWidget")
-        BackendWidget.resize(236, 205)
+        BackendWidget.resize(313, 235)
         self.main_layout = QVBoxLayout(BackendWidget)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -83,9 +83,9 @@ class Ui_BackendWidget(object):
 
         self.main_layout.addWidget(self.subtitle)
 
-        self.verticalLayout_2 = QVBoxLayout()
-        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.verticalLayout_2.setContentsMargins(-1, 30, -1, -1)
+        self.progress_layout = QVBoxLayout()
+        self.progress_layout.setObjectName(u"progress_layout")
+        self.progress_layout.setContentsMargins(-1, 30, -1, -1)
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.indicator_step = HLabel(BackendWidget, theme=theme)
@@ -103,16 +103,16 @@ class Ui_BackendWidget(object):
         self.horizontalLayout.addWidget(self.indicator_progress)
 
 
-        self.verticalLayout_2.addLayout(self.horizontalLayout)
+        self.progress_layout.addLayout(self.horizontalLayout)
 
         self.progress_bar = HProgressBar(BackendWidget, theme=theme)
         self.progress_bar.setObjectName(u"progress_bar")
         self.progress_bar.setValue(0)
 
-        self.verticalLayout_2.addWidget(self.progress_bar)
+        self.progress_layout.addWidget(self.progress_bar)
 
 
-        self.main_layout.addLayout(self.verticalLayout_2)
+        self.main_layout.addLayout(self.progress_layout)
 
         self.verticalSpacer_2 = QSpacerItem(20, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
@@ -128,7 +128,7 @@ class Ui_BackendWidget(object):
         BackendWidget.setWindowTitle(QCoreApplication.translate("BackendWidget", u"Form", None))
         self.title.setText(QCoreApplication.translate("BackendWidget", u"Installation of the processing server", None))
         self.subtitle.setText(QCoreApplication.translate("BackendWidget", u"This software is a framework in charge of converting models, processing images, video. It uses the Computational Resources available on your system.", None))
-        self.indicator_step.setText(QCoreApplication.translate("BackendWidget", u"Downloading", None))
+        self.indicator_step.setText(QCoreApplication.translate("BackendWidget", u"Installing backend...", None))
         self.indicator_progress.setText(QCoreApplication.translate("BackendWidget", u"100%", None))
     # retranslateUi
 

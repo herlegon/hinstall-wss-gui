@@ -16,7 +16,7 @@ from hinstall import (
     g_backend_dirs,
 )
 from hinstall import get_python_version
-from hytils import lightcyan, lightgreen, red
+from hytils import lightcyan, lightgreen, red, yellow
 from .log_handler import WorkerLogHandler
 import asyncio
 import json
@@ -79,6 +79,7 @@ class WsInstallClient:
         install_config: dict,
         stages: int | list[int],
         on_message: Optional[Callable] = None,
+        on_progress: Optional[Callable] = None,
         devmode: bool = False,
     ):
         # Stages from 0 to 2
@@ -97,6 +98,7 @@ class WsInstallClient:
         self._retry: bool = False
         self._do_restart: bool = False
         self._on_message = on_message or self._default_message_handler
+        self._on_progress = on_progress
         self._loop = None
         self.task_result: InstallTaskResult = None
         self.devmode = devmode
@@ -115,7 +117,7 @@ class WsInstallClient:
         delay = 0.5
         exception: str = ""
 
-        ilog.info(f"[INFO] Connecting to {self._uri}")
+        ilog.info(f"Connecting to {self._uri}")
         while self.wss_running:
             try:
                 async with connect(
@@ -126,7 +128,7 @@ class WsInstallClient:
                 ) as ws:
                     retries = 0
                     self.ws_cc = ws
-                    ilog.info("[INFO] Connected to backend")
+                    ilog.info("Connected to backend")
                     self.state = CommandState.IDLE
 
                     # Run state machine as the main driver, with background tasks
@@ -170,7 +172,7 @@ class WsInstallClient:
         self.wss_running = False
         self.ws_cc = None
         msg = f" with error: {exception}" if exception else ""
-        ilog.info(f"[INFO] Connection loop terminated, {msg}")
+        ilog.info(f"Connection loop terminated, {msg}")
 
 
     async def start(self):
@@ -234,15 +236,13 @@ class WsInstallClient:
 
     def handle_event(self, event: EventMessage) -> None:
         """Handle EventMessage"""
-        if event.type == "msg":
+        if event.type == "log":
             # Handle message event
-            # print(orange(event))
-            level = event.payload['type']
+            level = event.payload['level']
             text = event.payload['text']
-            prefix = (
-                LEVEL_MAPPING.get(level, "[?]")
-            )
-            print(f"{prefix} {text}")
+            ilog.log(level, f"[wss] {text}")
+            if level >= logging.CRITICAL:
+                self.state = CommandState.CRITICAL
 
         elif event.type == "telemetry":
             # Handle telemetry event
@@ -254,10 +254,8 @@ class WsInstallClient:
 
         elif event.type == "progress":
             p: InstallProgress = InstallProgress(**event.payload)
-            if p.type == 'indet' and p.progress != 100:
-                print(f"[PROGRESS][INDENT] {p.task_id} {p.package_name}")
-            else:
-                print(f"[PROGRESS] {p.task_id} {p.package_name} {p.progress}")
+            if self._on_progress:
+                self._on_progress(p)
 
 
     def handle_response(self, response: ResponseMessage) -> None:
@@ -274,8 +272,6 @@ class WsInstallClient:
         if response.type == 'shutdown':
             self.wss_running = False
             return
-
-        print(f"handle_response: {response}")
 
 
     async def _send_message(self, message: RequestMessage | str):
@@ -404,12 +400,10 @@ class WsInstallClient:
             print(red("Error! wrong task_id"))
 
         elif self.task_result.status == 'installed':
-            print(f"installed stage {self.stages[0]}")
             self.stages.pop(0)
-            if self.task_result.restart:
+            if self.stages and self.task_result.restart:
                 self.state = CommandState.RESTART
             elif self.stages:
-                print("next stage")
                 self.state = CommandState.INSTALL
             else:
                 self.state = CommandState.SHUTDOWN
@@ -418,7 +412,7 @@ class WsInstallClient:
         elif self.task_result.status == 'failed':
             self._retry = True
             self.state = CommandState.RESTART
-            print(red("Failed installing"))
+            print(red("Installation failed."))
 
 
     async def _state_shutdown(self) -> None:
@@ -489,4 +483,3 @@ class WsInstallClient:
         self.wss_running = False
         if self.ws_cc:
             await self.ws_cc.close()
-        print("end of the state machine")

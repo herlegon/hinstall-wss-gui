@@ -25,8 +25,14 @@ from hinstall import (
 )
 from hytils import lightcyan, yellow
 from .ws_install_client import (
-    RequestMessage, ResponseMessage, WsInstallClient, deserialize, serialize, WssIdentity,
-    CommandState
+    RequestMessage,
+    ResponseMessage,
+    WsInstallClient,
+    deserialize,
+    serialize,
+    WssIdentity,
+    CommandState,
+    InstallProgress,
 )
 from .log_handler import WorkerLogHandler
 from websockets import (
@@ -37,7 +43,7 @@ from websockets import (
 )
 
 class BackendInstallWorker(QThread):
-    progress = Signal(float)
+    progress = Signal(str, float)
     task_name = Signal(str)
     finished = Signal(bool, list)
 
@@ -263,6 +269,7 @@ class BackendInstallWorker(QThread):
                     install_config=install_config,
                     stages=remaining_stages,
                     devmode=devmode,
+                    on_progress=self._on_client_progress
                 )
                 await self.client.start()
 
@@ -311,8 +318,10 @@ class BackendInstallWorker(QThread):
 
         ilog.removeHandler(logging_handler)
         print(lightcyan("BackendInstallWorker: ended"))
-        self.progress.emit(100)
-        self.task_name.emit("Finished.")
+        self.progress.emit("", 100)
+        self.task_name.emit(
+            "Installed." if succes else "Failed to install."
+        )
         self.finished.emit(succes, [])
 
 
@@ -465,4 +474,7 @@ class BackendInstallWorker(QThread):
 
     #     self.quit()
     #     self.wait()
-
+    def _on_client_progress(self, p: InstallProgress):
+        if p.package_name:
+            self.task_name.emit(f"Installing {p.package_name}...")
+        self.progress.emit(p.type, p.progress)

@@ -66,7 +66,7 @@ class Ui_ThirdPartiesInstall(object):
     def setupUi(self, ThirdPartiesInstall, theme: Type[Theme]):
         if not ThirdPartiesInstall.objectName():
             ThirdPartiesInstall.setObjectName(u"ThirdPartiesInstall")
-        ThirdPartiesInstall.resize(334, 228)
+        ThirdPartiesInstall.resize(407, 175)
         self.main_layout = QVBoxLayout(ThirdPartiesInstall)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -126,7 +126,7 @@ class Ui_ThirdPartiesInstall(object):
         ThirdPartiesInstall.setWindowTitle(QCoreApplication.translate("ThirdPartiesInstall", u"Form", None))
         self.title.setText(QCoreApplication.translate("ThirdPartiesInstall", u"Third-party software", None))
         self.subtitle.setText(QCoreApplication.translate("ThirdPartiesInstall", u"Download and installation of third parties software", None))
-        self.indicator_step.setText(QCoreApplication.translate("ThirdPartiesInstall", u"Downloading FFmpeg", None))
+        self.indicator_step.setText(QCoreApplication.translate("ThirdPartiesInstall", u"Download and installing third parties software...", None))
         self.indicator_progress.setText(QCoreApplication.translate("ThirdPartiesInstall", u"100%", None))
     # retranslateUi
 

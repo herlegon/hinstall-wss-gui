@@ -255,17 +255,36 @@ class InstallerWindow(QMainWindow):
         self.log_spacing = 4
         self.log_layout.setSpacing(self.log_spacing)
 
-        # Log Toggle Button
+        # Log Buttons
+        self.log_buttons_layout = QHBoxLayout(self.log_container)
+        self.log_buttons_layout.setSpacing(8)
+
         self.log_button = HFramelessButton(parent=self, text="Show Log", theme=theme)
         self.log_button.setCheckable(True)
         self.log_button.setChecked(False)
         self.log_button.setFixedWidth(self.log_button.sizeHint().width())
 
+        self.log_copy_button = HFramelessButton(parent=self, text="Copy", theme=theme)
+        self.log_copy_button.setCheckable(False)
+        self.log_copy_button.setFixedWidth(self.log_copy_button.sizeHint().width())
+
+        self.log_open_button = HFramelessButton(parent=self, text="Open", theme=theme)
+        self.log_open_button.setCheckable(False)
+        self.log_open_button.setFixedWidth(self.log_open_button.sizeHint().width())
+
+        self.log_buttons_layout.addWidget(self.log_button)
+        self.log_buttons_layout.addWidget(self.log_copy_button)
+        self.log_buttons_layout.addWidget(self.log_open_button)
+        self.log_buttons_layout.addStretch()
+
         self.log_viewer = HLogViewer(parent=self, theme=theme)
         self.log_viewer.setVisible(False)
+        self.log_copy_button.setVisible(False)
+        self.log_open_button.setVisible(False)
+
         self.log_viewer_height = 150  # Fixed height for log viewer
         self.log_viewer.setFixedHeight(self.log_viewer_height)
-        self.log_layout.addWidget(self.log_button)
+        self.log_layout.addLayout(self.log_buttons_layout)
         self.log_layout.addWidget(self.log_viewer)
         self.log_button.clicked.connect(self.slot_toggle_log)
 
@@ -318,6 +337,7 @@ class InstallerWindow(QMainWindow):
         self.center_on_screen()
 
         if self.dev:
+            self.log_button.setChecked(True)
             self.slot_toggle_log(True)
 
 
@@ -341,12 +361,16 @@ class InstallerWindow(QMainWindow):
         self.blockSignals(True)
         if not was_visible and b:
             # Show log viewer and expand window height
+            self.log_copy_button.setVisible(True)
+            self.log_open_button.setVisible(True)
             new_height = window_height + log_height
             self.setFixedSize(self.width(), new_height)
             self.log_viewer.show()
 
         elif was_visible and not b:
             # Hide log viewer and shrink window height
+            self.log_copy_button.setVisible(False)
+            self.log_open_button.setVisible(False)
             self.log_viewer.hide()
             new_height = window_height - log_height
             self.setFixedSize(self.width(), new_height)

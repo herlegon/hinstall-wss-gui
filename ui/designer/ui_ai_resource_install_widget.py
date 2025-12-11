@@ -103,8 +103,8 @@ class Ui_AiResourceInstallWidget(object):
 
         self.main_layout.addLayout(self.verticalLayout)
 
-        self.verticalLayout_2 = QVBoxLayout()
-        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
+        self.progress_layout = QVBoxLayout()
+        self.progress_layout.setObjectName(u"progress_layout")
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.label = HLabel(AiResourceInstallWidget, theme=theme)
@@ -122,16 +122,16 @@ class Ui_AiResourceInstallWidget(object):
         self.horizontalLayout.addWidget(self.label_2)
 
 
-        self.verticalLayout_2.addLayout(self.horizontalLayout)
+        self.progress_layout.addLayout(self.horizontalLayout)
 
         self.progress_bar = HProgressBar(AiResourceInstallWidget, theme=theme)
         self.progress_bar.setObjectName(u"progress_bar")
         self.progress_bar.setValue(0)
 
-        self.verticalLayout_2.addWidget(self.progress_bar)
+        self.progress_layout.addWidget(self.progress_bar)
 
 
-        self.main_layout.addLayout(self.verticalLayout_2)
+        self.main_layout.addLayout(self.progress_layout)
 
         self.verticalSpacer_2 = QSpacerItem(543, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
@@ -157,7 +157,7 @@ class Ui_AiResourceInstallWidget(object):
         self.label_4.setText(QCoreApplication.translate("AiResourceInstallWidget", u"- Nvidia TensorRT", None))
         self.label_3.setText(QCoreApplication.translate("AiResourceInstallWidget", u"- PyTorch (CUDA)", None))
         self.label_5.setText(QCoreApplication.translate("AiResourceInstallWidget", u"- Microsoft DirectML", None))
-        self.label.setText(QCoreApplication.translate("AiResourceInstallWidget", u"Downloading", None))
+        self.label.setText(QCoreApplication.translate("AiResourceInstallWidget", u"Installing AI Computational Resources...", None))
         self.label_2.setText(QCoreApplication.translate("AiResourceInstallWidget", u"100%", None))
         self.comment.setText(QCoreApplication.translate("AiResourceInstallWidget", u"You choose to keep the downloaded files. You can remove these files in the settings window.", None))
     # retranslateUi

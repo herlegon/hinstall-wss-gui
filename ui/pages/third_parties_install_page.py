@@ -66,6 +66,7 @@ class ThirdPartiesInstallPage(Page, Ui_ThirdPartiesInstall):
 
 
     def update_settings(self, settings: dict[str, Any]) -> None:
+        self.reset_widgets()
         self.settings: dict = settings
 
         if self.packages is None:
