@@ -45,7 +45,7 @@
       </size>
      </property>
      <property name="text">
-      <string>Some additional software will be installed adapted to your system:</string>
+      <string>Additional components optimized for your system will now be installed</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
@@ -53,7 +53,7 @@
     </widget>
    </item>
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout">
+    <layout class="QVBoxLayout" name="syscap_layout">
      <item>
       <widget class="QLabel" name="label_4">
        <property name="text">
@@ -78,11 +78,27 @@
     </layout>
    </item>
    <item>
+    <spacer name="syscap_spacer">
+     <property name="orientation">
+      <enum>Qt::Orientation::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Policy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>543</width>
+       <height>16</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
     <layout class="QVBoxLayout" name="progress_layout">
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
-        <widget class="QLabel" name="label">
+        <widget class="QLabel" name="indicator_step">
          <property name="text">
           <string>Installing AI Computational Resources...</string>
          </property>
@@ -102,7 +118,7 @@
         </spacer>
        </item>
        <item>
-        <widget class="QLabel" name="label_2">
+        <widget class="QLabel" name="indicator_progress">
          <property name="text">
           <string>100%</string>
          </property>
@@ -131,22 +147,6 @@
       </size>
      </property>
     </spacer>
-   </item>
-   <item>
-    <widget class="QLabel" name="comment">
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>48</height>
-      </size>
-     </property>
-     <property name="text">
-      <string>You choose to keep the downloaded files. You can remove these files in the settings window.</string>
-     </property>
-     <property name="wordWrap">
-      <bool>true</bool>
-     </property>
-    </widget>
    </item>
   </layout>
  </widget>

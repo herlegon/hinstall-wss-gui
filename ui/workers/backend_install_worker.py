@@ -46,31 +46,34 @@ class BackendInstallWorker(QThread):
     progress = Signal(str, float)
     task_name = Signal(str)
     finished = Signal(bool, list)
+    signal_syscap_updated = Signal(dict)
 
 
     def __init__(
         self,
         settings: dict[str, Any],
         app_cfg: dict[str, Any],
+        stages: int | list[int],
     ):
         super().__init__()
         self.user_settings = settings
         self.app_cfg = app_cfg
         self._backend_process: subprocess.Popen = None
+        self.stages = stages
 
 
     def run(self):
         # Create handler to forward log to log viewer
-        handler = WorkerLogHandler(self)
-        handler.setFormatter(logging.Formatter('[S] %(message)s'))
-        ilog.addHandler(handler)
+        log_handler = WorkerLogHandler(self)
+        log_handler.setFormatter(logging.Formatter('[S] %(message)s'))
+        ilog.addHandler(log_handler)
 
         backend_python_version: str = get_python_version()
         ilog.info(f"Backend python version: {backend_python_version}")
 
         backend_env = generate_backend_env()
         if backend_env is None:
-            ilog.removeHandler(handler)
+            ilog.removeHandler(log_handler)
             return
 
         sep: str = ";" if sys.platform == "win32" else ":"
@@ -103,7 +106,7 @@ class BackendInstallWorker(QThread):
                 ilog.critical("Backend server is not found, can't continue.")
             else:
                 ilog.critical(f"Backend used for dev is not found in {repo_dirs}, can't continue.")
-            ilog.removeHandler(handler)
+            ilog.removeHandler(log_handler)
             return
 
         # Add the path when in devmode
@@ -129,7 +132,12 @@ class BackendInstallWorker(QThread):
         # Run all async operations in a single event loop
         # starts a new event loop and runs the coroutine self._async_run
         asyncio.run(
-            self._async_run(server_ip, backend_script_fp, handler)
+            self._async_run(
+                server_ip=server_ip,
+                backend_script_fp=backend_script_fp,
+                logging_handler=log_handler,
+                stages=self.stages,
+            )
         )
 
 
@@ -269,7 +277,8 @@ class BackendInstallWorker(QThread):
                     install_config=install_config,
                     stages=remaining_stages,
                     devmode=devmode,
-                    on_progress=self._on_client_progress
+                    on_progress=self._on_client_progress,
+                    on_syscap_refreshed=self._on_syscap_refreshed,
                 )
                 await self.client.start()
 
@@ -478,3 +487,7 @@ class BackendInstallWorker(QThread):
         if p.package_name:
             self.task_name.emit(f"Installing {p.package_name}...")
         self.progress.emit(p.type, p.progress)
+
+
+    def _on_syscap_refreshed(self, syscap: dict) -> None:
+        self.signal_syscap_updated.emit(syscap)

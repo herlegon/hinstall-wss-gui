@@ -83,43 +83,47 @@ class Ui_AiResourceInstallWidget(object):
 
         self.main_layout.addWidget(self.subtitle)
 
-        self.verticalLayout = QVBoxLayout()
-        self.verticalLayout.setObjectName(u"verticalLayout")
+        self.syscap_layout = QVBoxLayout()
+        self.syscap_layout.setObjectName(u"syscap_layout")
         self.label_4 = HLabel(AiResourceInstallWidget, theme=theme)
         self.label_4.setObjectName(u"label_4")
 
-        self.verticalLayout.addWidget(self.label_4)
+        self.syscap_layout.addWidget(self.label_4)
 
         self.label_3 = HLabel(AiResourceInstallWidget, theme=theme)
         self.label_3.setObjectName(u"label_3")
 
-        self.verticalLayout.addWidget(self.label_3)
+        self.syscap_layout.addWidget(self.label_3)
 
         self.label_5 = HLabel(AiResourceInstallWidget, theme=theme)
         self.label_5.setObjectName(u"label_5")
 
-        self.verticalLayout.addWidget(self.label_5)
+        self.syscap_layout.addWidget(self.label_5)
 
 
-        self.main_layout.addLayout(self.verticalLayout)
+        self.main_layout.addLayout(self.syscap_layout)
+
+        self.syscap_spacer = QSpacerItem(543, 16, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+
+        self.main_layout.addItem(self.syscap_spacer)
 
         self.progress_layout = QVBoxLayout()
         self.progress_layout.setObjectName(u"progress_layout")
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.label = HLabel(AiResourceInstallWidget, theme=theme)
-        self.label.setObjectName(u"label")
+        self.indicator_step = HLabel(AiResourceInstallWidget, theme=theme)
+        self.indicator_step.setObjectName(u"indicator_step")
 
-        self.horizontalLayout.addWidget(self.label)
+        self.horizontalLayout.addWidget(self.indicator_step)
 
         self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout.addItem(self.horizontalSpacer)
 
-        self.label_2 = HLabel(AiResourceInstallWidget, theme=theme)
-        self.label_2.setObjectName(u"label_2")
+        self.indicator_progress = HLabel(AiResourceInstallWidget, theme=theme)
+        self.indicator_progress.setObjectName(u"indicator_progress")
 
-        self.horizontalLayout.addWidget(self.label_2)
+        self.horizontalLayout.addWidget(self.indicator_progress)
 
 
         self.progress_layout.addLayout(self.horizontalLayout)
@@ -137,13 +141,6 @@ class Ui_AiResourceInstallWidget(object):
 
         self.main_layout.addItem(self.verticalSpacer_2)
 
-        self.comment = HComment(AiResourceInstallWidget, theme=theme)
-        self.comment.setObjectName(u"comment")
-        self.comment.setMaximumSize(QSize(16777215, 48))
-        self.comment.setWordWrap(True)
-
-        self.main_layout.addWidget(self.comment)
-
 
         self.retranslateUi(AiResourceInstallWidget)
 
@@ -153,12 +150,11 @@ class Ui_AiResourceInstallWidget(object):
     def retranslateUi(self, AiResourceInstallWidget):
         AiResourceInstallWidget.setWindowTitle(QCoreApplication.translate("AiResourceInstallWidget", u"Form", None))
         self.title.setText(QCoreApplication.translate("AiResourceInstallWidget", u"Installation of AI Computational Resources", None))
-        self.subtitle.setText(QCoreApplication.translate("AiResourceInstallWidget", u"Some additional software will be installed adapted to your system:", None))
+        self.subtitle.setText(QCoreApplication.translate("AiResourceInstallWidget", u"Additional components optimized for your system will now be installed", None))
         self.label_4.setText(QCoreApplication.translate("AiResourceInstallWidget", u"- Nvidia TensorRT", None))
         self.label_3.setText(QCoreApplication.translate("AiResourceInstallWidget", u"- PyTorch (CUDA)", None))
         self.label_5.setText(QCoreApplication.translate("AiResourceInstallWidget", u"- Microsoft DirectML", None))
-        self.label.setText(QCoreApplication.translate("AiResourceInstallWidget", u"Installing AI Computational Resources...", None))
-        self.label_2.setText(QCoreApplication.translate("AiResourceInstallWidget", u"100%", None))
-        self.comment.setText(QCoreApplication.translate("AiResourceInstallWidget", u"You choose to keep the downloaded files. You can remove these files in the settings window.", None))
+        self.indicator_step.setText(QCoreApplication.translate("AiResourceInstallWidget", u"Installing AI Computational Resources...", None))
+        self.indicator_progress.setText(QCoreApplication.translate("AiResourceInstallWidget", u"100%", None))
     # retranslateUi
 

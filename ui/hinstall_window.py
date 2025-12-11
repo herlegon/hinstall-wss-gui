@@ -166,7 +166,7 @@ class InstallerWindow(QMainWindow):
         step_container = QWidget()
         step_container.setStyleSheet(f"background-color: {theme.window_bgd};")
         step_container_layout = QHBoxLayout(step_container)
-        step_container_layout.setContentsMargins(0, 0, 0, 0)
+        step_container_layout.setContentsMargins(0, 8, 0, 6)
 
         self.step_indicator = HStepIndicator(self, theme=theme)
         step_labels: list[str] = list(
@@ -307,7 +307,7 @@ class InstallerWindow(QMainWindow):
         main_layout.addWidget(navigation_widget)
 
         # Initial
-        self.current_index: int = 3
+        self.current_index: int = 4
         if not self.dev:
             self.current_index = 0
         self.step_indicator.setCurrentStep(self.current_index)

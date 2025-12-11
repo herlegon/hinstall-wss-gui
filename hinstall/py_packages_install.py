@@ -221,9 +221,8 @@ def get_pypackage_list(python_exe: Path | None = None) -> str:
 
 
 
-def get_py_package_versions() -> list[str]:
-    packages = {dist.name: dist.version for dist in distributions()}
-    return [f"{name}=={version}" for name, version in sorted(packages.items())]
+def get_py_package_versions() -> dict[str, str]:
+    return {dist.name: dist.version for dist in distributions()}
 
 
 

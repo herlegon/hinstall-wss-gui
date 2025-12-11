@@ -33,9 +33,12 @@ from websockets import (
 class CommandState(Enum):
     """State machine states for command sequence"""
     IDLE = 'idle'
+    PARSE = 'parse'
     PARSING = 'parsing'
-    FETCH_SYS_INFO = 'fetch_backend_details'
-    FETCHING_SYS_INFO = 'fetching_backend_details'
+    FETCH_PACKAGE_VERSIONS = 'fetch_package_versions'
+    FETCHING_PACKAGE_VERSIONS = 'fetching_package_versions'
+    FETCH_SYSCAP = 'fetch_sys_cap'
+    FETCHING_SYSCAP = 'fetching_sys_cap'
     INSTALL = 'install'
     INSTALLING = 'installing'
     RESTART = 'restart'
@@ -59,6 +62,8 @@ from api import (
     InstallTaskResult,
     InstallProgress,
     InstallTask,
+    PackageVersions,
+    SysCap,
 )
 
 
@@ -80,6 +85,7 @@ class WsInstallClient:
         stages: int | list[int],
         on_message: Optional[Callable] = None,
         on_progress: Optional[Callable] = None,
+        on_syscap_refreshed: Optional[Callable] = None,
         devmode: bool = False,
     ):
         # Stages from 0 to 2
@@ -97,11 +103,12 @@ class WsInstallClient:
         self.state = CommandState.IDLE
         self._retry: bool = False
         self._do_restart: bool = False
-        self._on_message = on_message or self._default_message_handler
         self._on_progress = on_progress
+        self._on_syscap_refreshed = on_syscap_refreshed
         self._loop = None
         self.task_result: InstallTaskResult = None
         self.devmode = devmode
+        self.response = None
 
 
     def retry(self) -> bool:
@@ -129,7 +136,7 @@ class WsInstallClient:
                     retries = 0
                     self.ws_cc = ws
                     ilog.info("Connected to backend")
-                    self.state = CommandState.IDLE
+                    self.state = CommandState.PARSE
 
                     # Run state machine as the main driver, with background tasks
                     tasks = [
@@ -192,12 +199,6 @@ class WsInstallClient:
                     await self.ws_cc.close()
 
             asyncio.run_coroutine_threadsafe(close_ws(), self._loop)
-
-
-    def _default_message_handler(self, msg: dict):
-        print(lightcyan("rcv"), msg)
-        # ilog.debug(f"Message received: {msg}")
-        pass
 
 
     async def _reception_task(self):
@@ -263,15 +264,18 @@ class WsInstallClient:
         """
         if response.type == 'pong':
             self._last_pong = time.time()
-            return
 
-        if response.type == 'install':
+        elif response.type == 'install':
             self.task_result = InstallTaskResult(**response.payload)
-            return
 
-        if response.type == 'shutdown':
+        elif response.type == 'versions':
+            self.response = PackageVersions(**response.payload)
+
+        elif response.type == 'syscap':
+            self.response = SysCap(**response.payload)
+
+        elif response.type == 'shutdown':
             self.wss_running = False
-            return
 
 
     async def _send_message(self, message: RequestMessage | str):
@@ -335,6 +339,10 @@ class WsInstallClient:
     # STATE MACHINE
     #-------------------------------------------------------------------------------------
     async def _state_idle(self) -> None:
+        await asyncio.sleep(0.5)
+
+
+    async def _state_parse(self) -> None:
         cfg = self.install_config
         toml_cfg = cfg.get('toml', "")
         task = ParseTask(
@@ -363,24 +371,67 @@ class WsInstallClient:
         elif self.task_result.status == 'parsed':
             self.task_result = None
             if self.stages[0] == 2:
-                self.state = CommandState.FETCH_SYS_INFO
-            self.state = CommandState.INSTALL
+                self.state = CommandState.FETCH_SYSCAP
+            else:
+                self.state = CommandState.INSTALL
 
         elif self.task_result.status == 'failed':
             # Cannot continue
-            self.state = CommandState.END
+            self.state = CommandState.ENDED
             print(red("Failed parsing"))
 
 
-    async def _state_fetch_sysinfo(self) -> None:
-        ilog.critical("TODO")
-        self.state = CommandState.FETCHING_SYS_INFO
-        await asyncio.sleep(0)
+    async def _state_fetch_package_versions(self) -> None:
+        self.response = None
+        self.state = CommandState.FETCH_PACKAGE_VERSIONS
+        await self._send_message(RequestMessage(type='versions'))
 
 
-    async def _state_fetching_sysinfo(self) -> None:
-        self.state = CommandState.INSTALL
-        await asyncio.sleep(0)
+    async def _state_fetching_package_versions(self) -> None:
+        response: PackageVersions = self.response
+        if response is None:
+            await asyncio.sleep(0.5)
+
+        elif response.packages:
+            msg: str = (
+                "Package versions:\n  "
+                + "\n  ".join([
+                    f"{name}    {version}"
+                    for name, version in sorted(response.packages.items())
+                ])
+            )
+            ilog.info(msg)
+            self.response = None
+            self.state = CommandState.INSTALL
+
+
+    async def _state_fetch_syscap(self) -> None:
+        self.response = None
+        self.state = CommandState.FETCHING_SYSCAP
+        await self._send_message(RequestMessage(type='syscap'))
+
+
+    async def _state_fetching_syscap(self) -> None:
+        response: SysCap = self.response
+        if response is None:
+            await asyncio.sleep(0.5)
+
+        else:
+            msg: str = (
+                "Capabilities:\n  "
+                + "\n  ".join([
+                    f"{s}: {'yes' if c else 'no'}"
+                    for s, c in sorted(response.syscap.items()) if s != "ncnn"
+                ])
+            )
+            ilog.info(msg)
+
+            # Forward to AiResourceInstallPage
+            if self._on_syscap_refreshed:
+                self._on_syscap_refreshed(response.syscap)
+
+            self.response = None
+            self.state = CommandState.INSTALL
 
 
     async def _state_install(self) -> None:
@@ -460,9 +511,12 @@ class WsInstallClient:
 
         state_map: dict[CommandState, Callable] = {
             CommandState.IDLE: self._state_idle,
+            CommandState.PARSE: self._state_parse,
             CommandState.PARSING: self._state_parsing,
-            CommandState.FETCH_SYS_INFO: self._state_fetch_sysinfo,
-            CommandState.FETCHING_SYS_INFO: self._state_fetching_sysinfo,
+            CommandState.FETCH_PACKAGE_VERSIONS: self._state_fetch_package_versions,
+            CommandState.FETCHING_PACKAGE_VERSIONS: self._state_fetching_package_versions,
+            CommandState.FETCH_SYSCAP: self._state_fetch_syscap,
+            CommandState.FETCHING_SYSCAP: self._state_fetching_syscap,
             CommandState.INSTALL: self._state_install,
             CommandState.INSTALLING: self._state_installing,
             CommandState.RESTART: self._state_restart,

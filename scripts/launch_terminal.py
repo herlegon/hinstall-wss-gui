@@ -17,22 +17,22 @@ if __name__ == "__main__":
 
     # 1. Determine the shell and arguments
     if sys.platform == "win32":
-        # shell = os.environ.get("COMSPEC", "cmd.exe")
-        # clear_conda = (
-        #     'set "CONDA_EXE=" & '
-        #     'set "CONDA_EXES=" & '
-        #     'set "CONDA_SHLVL=" & '
-        #     'set "CONDA_PREFIX=" & '
-        #     'set "CONDA_DEFAULT_ENV=" & '
-        #     'set "CONDA_PROMPT_MODIFIER=" & '
-        #     'set "_CE_CONDA=" & '
-        #     'set "_CE_M=" & '
-        #     'cls'
-        # )
+        shell = "powershell.exe"
+        clear_conda_ps = (
+            "Remove-Item Env:CONDA_EXE -ErrorAction Ignore; "
+            "Remove-Item Env:CONDA_EXES -ErrorAction Ignore; "
+            "Remove-Item Env:CONDA_SHLVL -ErrorAction Ignore; "
+            "Remove-Item Env:CONDA_PREFIX -ErrorAction Ignore; "
+            "Remove-Item Env:CONDA_DEFAULT_ENV -ErrorAction Ignore; "
+            "Remove-Item Env:CONDA_PROMPT_MODIFIER -ErrorAction Ignore; "
+            "Remove-Item Env:_CE_CONDA -ErrorAction Ignore; "
+            "Remove-Item Env:_CE_M -ErrorAction Ignore; "
+            "Clear-Host;"
+            'function prompt {"[hrl] " + $(Get-Location) + "> "};'
+        )
 
         print(f"--- Launching standalone terminal ({shell}) ---")
-        # cmd = [shell, "/D", "/K", clear_conda]
-        cmd = [shell, "-NoExit", "-Command", "Clear-Host"]
+        cmd = [shell, "-NoExit", "-Command", clear_conda_ps]
         subprocess.run(
             cmd,
             env=backend_env,
@@ -40,6 +40,7 @@ if __name__ == "__main__":
             stdout=sys.stdout,
             stderr=sys.stderr
         )
+
     else:
         # Linux/Mac: Use os.execvpe for full process replacement (best method)
         shell = os.environ.get("SHELL", "/bin/bash")
