@@ -9,6 +9,7 @@ import sys
 from hytils import yellow
 from .logger import ilog
 from .backend_dirs import g_backend_dirs
+from importlib.metadata import distributions
 
 
 
@@ -220,6 +221,12 @@ def get_pypackage_list(python_exe: Path | None = None) -> str:
 
 
 
+def get_py_package_versions() -> list[str]:
+    packages = {dist.name: dist.version for dist in distributions()}
+    return [f"{name}=={version}" for name, version in sorted(packages.items())]
+
+
+
 def clean_invalid_distributions():
     try:
         result = subprocess.run(
@@ -239,12 +246,11 @@ def clean_invalid_distributions():
         if "Package" in line:
             break
         if "Ignoring invalid distribution ~" in line:
-            print(f"found: {line}")
             # Extract the name of the invalid distribution and its path from the warning
             match = re.search(r'Ignoring invalid distribution ~\S+ \((/[\S]+)\)', line)
             if match:
                 package_path = match.group(1)
-                print(f"Found invalid distribution at: {package_path}")
+                ilog.info(f"Found invalid distribution at: {package_path}")
                 # Clean up the invalid package directory
                 remove_invalid_package_files(Path(package_path))
 
@@ -260,10 +266,11 @@ def remove_invalid_package_files(invalid_package_dir: Path):
         # Iterate over all directories in the invalid_package_dir that start with '~'
         for dir_path in invalid_package_dir.iterdir():
             if dir_path.is_dir() and dir_path.name.startswith("~"):
-                ilog.debug(f"remove invalid directory: {dir_path}")
+                ilog.info(f"remove invalid directory: {dir_path}")
 
                 # Remove the directory and all its contents
                 shutil.rmtree(dir_path)
                 print(f"Removed directory: {dir_path}")
+
     except OSError as e:
         print(f"Error removing directories in {invalid_package_dir}: {e}")

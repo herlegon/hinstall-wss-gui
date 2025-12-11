@@ -22,9 +22,11 @@ from .parse_config import (
 from .py_package import PyPackage
 from .py_packages import PyPackages
 from .py_packages_install import (
-    get_python_version,
-    generate_backend_env,
     g_backend_env,
+    generate_backend_env,
+    get_python_version,
+    get_pypackage_list,
+    get_py_package_versions,
     clean_invalid_distributions,
 )
 
@@ -48,7 +50,9 @@ __all__ = [
     "get_domain_from_url",
     "check_site_reachable",
 
-    "clean_invalid_distributions"
+    "clean_invalid_distributions",
+    "get_pypackage_list",
+    "get_py_package_versions",
 
     "STATUS_LEVEL",
 ]
