@@ -116,7 +116,6 @@ class WsInstallClient:
         exception: str = ""
 
         ilog.info(f"[INFO] Connecting to {self._uri}")
-
         while self.wss_running:
             try:
                 async with connect(
@@ -130,11 +129,17 @@ class WsInstallClient:
                     ilog.info("[INFO] Connected to backend")
                     self.state = CommandState.IDLE
 
-                    await asyncio.gather(
-                        self._reception_task(),
-                        self._heartbeat_loop(),
-                        self.state_machine(),
-                    )
+                    # Run state machine as the main driver, with background tasks
+                    tasks = [
+                        asyncio.create_task(self._reception_task()),
+                        asyncio.create_task(self._heartbeat_loop()),
+                    ]
+                    try:
+                        await self.state_machine()
+                    finally:
+                        for t in tasks:
+                            t.cancel()
+                        await asyncio.gather(*tasks, return_exceptions=True)
 
                 if self.state == CommandState.RESTART:
                     self.wss_running = False
@@ -334,7 +339,17 @@ class WsInstallClient:
     # STATE MACHINE
     #-------------------------------------------------------------------------------------
     async def _state_idle(self) -> None:
-        task = ParseTask(**self.install_config)
+        cfg = self.install_config
+        toml_cfg = cfg.get('toml', "")
+        task = ParseTask(
+            app_name=cfg.get('app_name', ""),
+            cfg=json.dumps(toml_cfg),
+            cache=cfg.get('cache', True),
+            local_backend=cfg.get('local_backend', False),
+            reinstall=cfg.get('reinstall', False),
+            use_local_rehost=cfg.get('use_local_rehost', False),
+            local_rehost=cfg.get('local_rehost', ""),
+        )
         await self.send_task(task)
         self.task_result = None
         self.state = CommandState.PARSING
@@ -346,7 +361,7 @@ class WsInstallClient:
             await asyncio.sleep(0.5)
 
         # Task is finished
-        if self.task_result.task_id != 'parse':
+        elif self.task_result.task_id != 'parse':
             print(red("Error! wrong task_id"))
 
         elif self.task_result.status == 'parsed':
@@ -373,11 +388,9 @@ class WsInstallClient:
 
 
     async def _state_install(self) -> None:
-        print(self.stages)
         if not self.stages:
-            self.state = CommandState.END
+            self.state = CommandState.ENDED
 
-        print(f"current_stage: {self.stages[0]}")
         await self.send_task(InstallTask(stage=self.stages[0]))
         self.task_result = None
         self.state = CommandState.INSTALLING
@@ -387,7 +400,7 @@ class WsInstallClient:
         if self.task_result is None:
             await asyncio.sleep(0.5)
 
-        if self.task_result.task_id != 'install':
+        elif self.task_result.task_id != 'install':
             print(red("Error! wrong task_id"))
 
         elif self.task_result.status == 'installed':
@@ -467,8 +480,6 @@ class WsInstallClient:
         while self.wss_running and self.ws_cc:
             try:
                 await state_map.get(self.state, lambda: self._state_unknown())()
-                await asyncio.sleep(0.2)
-                print(CommandState(self.state))
 
             except Exception as e:
                 ilog.error(f"[ERROR] State machine error at state {CommandState(self.state)}: {e}")
@@ -476,4 +487,6 @@ class WsInstallClient:
                 break
 
         self.wss_running = False
+        if self.ws_cc:
+            await self.ws_cc.close()
         print("end of the state machine")

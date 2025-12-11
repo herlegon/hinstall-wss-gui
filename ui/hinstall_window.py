@@ -1,4 +1,5 @@
 from argparse import Namespace
+from copy import deepcopy
 from functools import partial
 from pathlib import Path
 from pprint import pprint
@@ -100,7 +101,9 @@ class InstallerWindow(QMainWindow):
         print(f"loading config: {config_fp}")
         with open(config_fp, "rb") as f:
             toml_cfg: dict[str, Any] = tomllib.load(f)
-        packages_cfg = parse_config_(toml_cfg)
+        # Use a copy because the original config has to be sent to the backend
+        # without any modifications
+        packages_cfg = parse_config_(deepcopy(toml_cfg))
         xtal_pkgs = ExtPackages(packages_cfg, sys.platform)
 
         # populate a list of pages

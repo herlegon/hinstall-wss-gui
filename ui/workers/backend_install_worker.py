@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from pprint import pprint
 import subprocess
 import sys
 import threading
@@ -208,6 +209,7 @@ class BackendInstallWorker(QThread):
             * but retry if failed
         - splash: automatically run both stages if asking to be up-to-date or 1st time
         """
+        succes: bool = False
         remaining_stages = stages
         devmode: bool = self.user_settings.get('devmode', False)
 
@@ -218,7 +220,7 @@ class BackendInstallWorker(QThread):
             port = await self._get_free_port_async(server_ip)
             if port is None:
                 ilog.critical(f"Another installation is on going or port is used by another process.")
-                self.task_name.emit("Cannot start backend.")
+                self.task_name.emit("Failed to start backend: no free port")
                 self.finished.emit(False, [])
                 ilog.removeHandler(logging_handler)
                 return
@@ -247,7 +249,7 @@ class BackendInstallWorker(QThread):
 
                 # Send this config and selection to backend.
                 install_config = {
-                    'cfg': json.dumps(self.app_cfg),
+                    'toml': self.app_cfg,
                     'local_backend': is_local_backend,
                     'reinstall': False,
                     'use_local_rehost': devmode and is_local_backend,
@@ -280,12 +282,19 @@ class BackendInstallWorker(QThread):
                         self._backend_process = None
                         if self.client.retry() and retry_max_count:
                             ilog.info("Restart requested. Reason: retry")
+
+                        elif not retry_max_count:
+                            ilog.info("Too many attemps, stop.")
+                            succes = False
+                            break
+
                         else:
                             ilog.info("Restart requested. Restarting backend loop...")
                         self._backend_process = None
 
                     else:
                         ilog.info("Shutdown")
+                        succes = True
                         break
 
             except Exception as e:
@@ -302,6 +311,10 @@ class BackendInstallWorker(QThread):
 
         ilog.removeHandler(logging_handler)
         print(lightcyan("BackendInstallWorker: ended"))
+        self.progress.emit(100)
+        self.task_name.emit("Finished.")
+        self.finished.emit(succes, [])
+
 
 
     async def _get_free_port_async(self, server_ip: str) -> int | None:
