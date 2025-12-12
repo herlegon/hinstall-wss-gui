@@ -127,20 +127,20 @@ class Ui_WelcomeWidget(object):
         self.custom_dir_layout = QHBoxLayout()
         self.custom_dir_layout.setObjectName(u"custom_dir_layout")
         self.custom_dir_layout.setContentsMargins(40, -1, -1, -1)
-        self.lineedit_custom_dir = HLineEdit(WelcomeWidget, theme=theme)
-        self.lineedit_custom_dir.setObjectName(u"lineedit_custom_dir")
-        self.lineedit_custom_dir.setEnabled(False)
-        self.lineedit_custom_dir.setMinimumSize(QSize(300, 0))
-        self.lineedit_custom_dir.setMaximumSize(QSize(500, 16777215))
-
-        self.custom_dir_layout.addWidget(self.lineedit_custom_dir, 0, Qt.AlignmentFlag.AlignLeft)
-
         self.icon_button_browse = HToggleButton(WelcomeWidget, theme=theme)
         self.icon_button_browse.setObjectName(u"icon_button_browse")
         self.icon_button_browse.setEnabled(False)
         self.icon_button_browse.setMaximumSize(QSize(24, 16777215))
 
         self.custom_dir_layout.addWidget(self.icon_button_browse)
+
+        self.lineedit_custom_dir = HLineEdit(WelcomeWidget, theme=theme)
+        self.lineedit_custom_dir.setObjectName(u"lineedit_custom_dir")
+        self.lineedit_custom_dir.setEnabled(False)
+        self.lineedit_custom_dir.setMinimumSize(QSize(500, 0))
+        self.lineedit_custom_dir.setMaximumSize(QSize(500, 16777215))
+
+        self.custom_dir_layout.addWidget(self.lineedit_custom_dir)
 
         self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 

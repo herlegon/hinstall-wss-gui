@@ -159,17 +159,18 @@ class Ui_FFmpegSelectionWidget(object):
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.horizontalLayout.setContentsMargins(40, -1, -1, -1)
-        self.line_edit_ffmpeg_dir = HLineEdit(FFmpegSelectionWidget, theme=theme)
-        self.line_edit_ffmpeg_dir.setObjectName(u"line_edit_ffmpeg_dir")
-        self.line_edit_ffmpeg_dir.setMaximumSize(QSize(300, 16777215))
-
-        self.horizontalLayout.addWidget(self.line_edit_ffmpeg_dir)
-
         self.outlined_button_browse = HOutlinedButton(FFmpegSelectionWidget, theme=theme)
         self.outlined_button_browse.setObjectName(u"outlined_button_browse")
         self.outlined_button_browse.setMaximumSize(QSize(24, 16777215))
 
         self.horizontalLayout.addWidget(self.outlined_button_browse)
+
+        self.line_edit_ffmpeg_dir = HLineEdit(FFmpegSelectionWidget, theme=theme)
+        self.line_edit_ffmpeg_dir.setObjectName(u"line_edit_ffmpeg_dir")
+        self.line_edit_ffmpeg_dir.setMinimumSize(QSize(500, 0))
+        self.line_edit_ffmpeg_dir.setMaximumSize(QSize(500, 16777215))
+
+        self.horizontalLayout.addWidget(self.line_edit_ffmpeg_dir)
 
         self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
@@ -217,8 +218,8 @@ class Ui_FFmpegSelectionWidget(object):
         self.radio_button_user.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Use an existing FFmpeg on your system", None))
         self.comment_external.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Select a pre-installed FFmpeg binary.\n"
 "You are responsible for license and patent compliance, including commercial use.", None))
-        self.line_edit_ffmpeg_dir.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"No file selected", None))
         self.outlined_button_browse.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"...", None))
+        self.line_edit_ffmpeg_dir.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"No file selected", None))
         self.disclaimer.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Disclaimer: neither Herlegon nor their developers are responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.", None))
     # retranslateUi
 

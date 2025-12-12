@@ -353,6 +353,8 @@ class WsInstallClient:
             reinstall=cfg.get('reinstall', False),
             use_local_rehost=cfg.get('use_local_rehost', False),
             local_rehost=cfg.get('local_rehost', ""),
+            ffmpeg_selection=cfg.get('ffmpeg_selection', 'lgpl'),
+            ffmpeg_user_dir=cfg.get('ffmpeg_user_dir', ""),
         )
         await self.send_task(task)
         self.task_result = None

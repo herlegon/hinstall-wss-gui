@@ -267,7 +267,9 @@ class BackendInstallWorker(QThread):
                     'local_backend': is_local_backend,
                     'reinstall': False,
                     'use_local_rehost': devmode and is_local_backend,
-                    'local_rehost': ""
+                    'local_rehost': "",
+                    'ffmepg_variant': self.user_settings.get('ffmpeg_selection', 'lgpl'),
+                    'ffmpeg_user_dir': self.user_settings.get('ffmpeg_user_dir', ""),
                 }
 
                 # Start the client in the same event loop

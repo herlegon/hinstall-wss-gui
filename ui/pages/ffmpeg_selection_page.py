@@ -1,4 +1,10 @@
 from typing import Any, Literal, Type
+import os
+import sys
+import subprocess
+
+
+
 from PySide6.QtCore import (
     Signal,
 )
@@ -11,7 +17,11 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
     QSizePolicy,
+    QFileDialog,
+    QMessageBox,
 )
+
+
 from hwidgets import (
     Theme,
 )
@@ -91,6 +101,12 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
         # Update the page geometry
         self.updateGeometry()
 
+        self.outlined_button_browse.clicked.connect(self.slot_select_ffmpeg)
+
+        self.radio_button_minimal.toggled.connect(self._update_ui_state)
+        self.radio_button_third_party.toggled.connect(self._update_ui_state)
+        self.radio_button_user.toggled.connect(self._update_ui_state)
+
         self.reset_widgets()
 
 
@@ -101,6 +117,7 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
         self.radio_button_minimal.setChecked(True)
         self.line_edit_ffmpeg_dir.setText("")
         self.line_edit_ffmpeg_dir.setEnabled(False)
+        self.line_edit_ffmpeg_dir.setReadOnly(True)
         self.outlined_button_browse.setEnabled(False)
 
 
@@ -137,7 +154,10 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
             # minimal (lgpl)
             self.radio_button_minimal.setChecked(True)
 
-        self.line_edit_ffmpeg_dir.setText(settings.get('ffmpeg_user_dir', ""))
+        path = settings.get('ffmpeg_user_dir', "")
+        self.line_edit_ffmpeg_dir.setText(path)
+
+        self._update_ui_state()
 
 
     def invalidate_all_layouts(self):
@@ -154,7 +174,78 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
         self.update()
 
         # Optionally, you can also call adjustSize to make sure the widget resizes to fit its content
-        self.adjustSize()
+    def slot_select_ffmpeg(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select FFmpeg Executable",
+            "",
+            "FFmpeg (ffmpeg.exe)" if sys.platform == 'win32' else "FFmpeg (ffmpeg)"
+        )
+
+        if not file_path:
+            return
+
+        parent_dir = os.path.dirname(file_path)
+        if self.validate_ffmpeg_dir(parent_dir):
+            self.line_edit_ffmpeg_dir.setText(str(file_path))
+        else:
+            QMessageBox.critical(
+                self,
+                "Invalid FFmpeg/FFprobe",
+                "FFmpeg and FFprobe must be in the same directory and be valid executables."
+            )
+
+
+    def validate_ffmpeg_dir(self, directory: str) -> bool:
+        ffmpeg_exe = "ffmpeg.exe" if sys.platform == 'win32' else "ffmpeg"
+        ffprobe_exe = "ffprobe.exe" if sys.platform == 'win32' else "ffprobe"
+
+        ffmpeg_path = os.path.join(directory, ffmpeg_exe)
+        ffprobe_path = os.path.join(directory, ffprobe_exe)
+
+        if not (os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path)):
+            self.completed.emit(False)
+            return False
+
+        # Check if they are valid executables
+        if not (self._check_executable(ffmpeg_path) and self._check_executable(ffprobe_path)):
+            self.completed.emit(False)
+            return False
+
+        self.completed.emit(True)
+        return True
+
+
+    def _check_executable(self, path: str) -> bool:
+        try:
+            startupinfo = None
+            if sys.platform == 'win32':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+            subprocess.run(
+                [path, "-version"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                startupinfo=startupinfo
+            )
+            return True
+
+        except (subprocess.CalledProcessError, OSError):
+            return False
+
+
+    def _update_ui_state(self):
+        is_user_defined = self.radio_button_user.isChecked()
+
+        self.line_edit_ffmpeg_dir.setEnabled(is_user_defined)
+        self.outlined_button_browse.setEnabled(is_user_defined)
+
+        if is_user_defined:
+            self.validate_ffmpeg_dir(self.line_edit_ffmpeg_dir.text())
+        else:
+            self.completed.emit(True)
 
 
 

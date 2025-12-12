@@ -81,6 +81,14 @@ class BackendInstallPage(Page, Ui_BackendWidget):
     def start_installation(self):
         self.indicator_step.setText("Installing backend...")
         # Create a worker that will communicate with the websocket server
+        # Check that user dir for FFmpeg is valid
+        if (
+            self.user_settings.get('ffmpeg_selection', 'lgpl') == 'user'
+            and not self.user_settings.get('ffmpeg_user_dir', "")
+        ):
+            ilog.critical("Erroneous FFmpeg selection")
+            return
+
         self.worker: BackendInstallWorker = BackendInstallWorker(
             settings=self.user_settings,
             app_cfg=self.app_cfg,
