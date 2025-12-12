@@ -60,6 +60,13 @@ class Page(QWidget, metaclass=QWidgetABCMeta):
         self._installation_started = False
         self._has_progress_bar: bool | None = None
 
+        # For pages with progress bar
+        self.indicator_progress_stylesheet = ""
+        try:
+            self.indicator_progress_stylesheet = self.indicator_progress.styleSheet()
+        except:
+            pass
+
 
 
     def _check_for_progress_bar(self) -> bool:
@@ -161,21 +168,26 @@ class Page(QWidget, metaclass=QWidgetABCMeta):
                         self.indicator_progress_stylesheet +
                         rf"QLabel{{font-size: 24px; color: green;}}"
                     )
-                    print(self.indicator_progress.styleSheet())
+                    self.indicator_progress.setVisible(True)
+
                 elif value == -1:
                     progress_text = "❌"
                     self.indicator_progress.setStyleSheet(
                         self.indicator_progress_stylesheet +
                         rf"QLabel{{font-size: 24px; color: red;}}"
                     )
+                    self.indicator_progress.setVisible(True)
 
                 else:
                     progress_text = f"{int(value + 0.5)}%"
-            else:
-                progress_text = value
-            self.indicator_progress.setText(progress_text)
-        except:
-            pass
+            # else:
+            #     self.indicator_progress.setStyleSheet(self.indicator_progress_stylesheet)
+            #     progress_text = f"{value}"
+            if progress_text:
+                self.indicator_progress.setText(progress_text)
+
+        except Exception as e:
+            print(red(f"exception: {str(e)}"))
 
 
     def slot_update_progress(self, type: Literal['progress', 'indet'], value: int):
@@ -189,7 +201,7 @@ class Page(QWidget, metaclass=QWidgetABCMeta):
                     self.progress_bar.setVisible(False)
                     self.indet_progress_bar.setVisible(True)
                     self.indet_progress_bar.start()
-                    self.indicator_progress.setText("")
+                    self.indicator_progress.setVisible(False)
 
             else:
                 if not self.progress_bar.isVisible():
@@ -214,8 +226,10 @@ class Page(QWidget, metaclass=QWidgetABCMeta):
 
             if duration:
                 self.progress_bar.setAnimationDuration(value)
-        except:
-            pass
+
+        except Exception as e:
+            print(red(f"exception: {str(e)}"))
+
 
 
     def slot_on_finished(self, success: bool, files: list[Path]):
@@ -237,12 +251,11 @@ class Page(QWidget, metaclass=QWidgetABCMeta):
                 self.progress_bar.setValue(0)
                 self.indet_progress_bar.stop()
                 self.set_progress_value(-1)
-                self.indicator_progress.setText("❌")
 
             self.progress_bar.setAnimationDuration(duration)
 
             self.installed_files = files
             time.sleep(0.8)
             self.completed.emit(success)
-        except:
-            pass
+        except Exception as e:
+            print(f"exception: {str(e)}")

@@ -307,7 +307,7 @@ class InstallerWindow(QMainWindow):
         main_layout.addWidget(navigation_widget)
 
         # Initial
-        self.current_index: int = 4
+        self.current_index: int = 0
         if not self.dev:
             self.current_index = 0
         self.step_indicator.setCurrentStep(self.current_index)

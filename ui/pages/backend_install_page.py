@@ -65,7 +65,6 @@ class BackendInstallPage(Page, Ui_BackendWidget):
         self.progress_layout.addWidget(self.indet_progress_bar)
         self.indet_progress_bar.setVisible(False)
         self.reset_widgets()
-        self.indicator_step_stylesheet = self.indicator_step.styleSheet()
 
 
     def reset_widgets(self) -> None:

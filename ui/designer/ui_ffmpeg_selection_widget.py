@@ -209,16 +209,16 @@ class Ui_FFmpegSelectionWidget(object):
 "H.264/H.265 decoding included for playback support.\n"
 "Hardware-accelerated H.264/H.265 encoders (requires an NVIDIA GPU).\n"
 "\u26a0\ufe0fDoes NOT include software H.264/H.265, AAC, or MP3 encoders.\n"
-"Safe for personal or commercial use without additional licenses.", None))
+"Safe for commercial use without additional licenses.", None))
         self.radio_button_third_party.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Download FFmpeg from a third-party", None))
         self.comment_third_party.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Includes full software H.264/H.265/AAC/MP3 encoders (GPL and patent-encumbered).\n"
-"Provided by a third party (e.g., BtbN). You are responsible for any licenses or patents.\n"
+"Provided by a third party. You are responsible for any licenses or patents.\n"
 "Commercial use may require separate patent licenses.", None))
         self.radio_button_user.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Use an existing FFmpeg on your system", None))
-        self.comment_external.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Select a pre-installed FFmpeg binary. Your software will call it externally.\n"
+        self.comment_external.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Select a pre-installed FFmpeg binary.\n"
 "You are responsible for license and patent compliance, including commercial use.", None))
         self.line_edit_ffmpeg_dir.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"No file selected", None))
         self.outlined_button_browse.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"...", None))
-        self.disclaimer.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Disclaimer: neither Herlegon nor their developers is responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.", None))
+        self.disclaimer.setText(QCoreApplication.translate("FFmpegSelectionWidget", u"Disclaimer: neither Herlegon nor their developers are responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.", None))
     # retranslateUi
 

@@ -99,6 +99,7 @@ class Ui_BackendWidget(object):
 
         self.indicator_progress = HLabel(BackendWidget, theme=theme)
         self.indicator_progress.setObjectName(u"indicator_progress")
+        self.indicator_progress.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
         self.horizontalLayout.addWidget(self.indicator_progress)
 

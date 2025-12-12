@@ -107,7 +107,7 @@
 H.264/H.265 decoding included for playback support.
 Hardware-accelerated H.264/H.265 encoders (requires an NVIDIA GPU).
 ⚠️Does NOT include software H.264/H.265, AAC, or MP3 encoders.
-Safe for personal or commercial use without additional licenses.</string>
+Safe for commercial use without additional licenses.</string>
          </property>
          <property name="indent">
           <number>40</number>
@@ -144,7 +144,7 @@ Safe for personal or commercial use without additional licenses.</string>
          </property>
          <property name="text">
           <string>Includes full software H.264/H.265/AAC/MP3 encoders (GPL and patent-encumbered).
-Provided by a third party (e.g., BtbN). You are responsible for any licenses or patents.
+Provided by a third party. You are responsible for any licenses or patents.
 Commercial use may require separate patent licenses.</string>
          </property>
          <property name="indent">
@@ -172,7 +172,7 @@ Commercial use may require separate patent licenses.</string>
        <item alignment="Qt::AlignmentFlag::AlignTop">
         <widget class="QLabel" name="comment_external">
          <property name="text">
-          <string>Select a pre-installed FFmpeg binary. Your software will call it externally.
+          <string>Select a pre-installed FFmpeg binary.
 You are responsible for license and patent compliance, including commercial use.</string>
          </property>
          <property name="indent">
