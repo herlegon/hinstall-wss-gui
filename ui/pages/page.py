@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod, ABCMeta
-from typing import Any, Type, List, Optional
+from pathlib import Path
+import time
+from typing import Any, Type, List, Optional, Literal
 from PySide6.QtCore import (
     Signal,
     QTimer,
@@ -11,7 +13,10 @@ from PySide6.QtWidgets import (
 )
 from hwidgets import (
     Theme,
-    HProgressBarType
+    HProgressBarType,
+    HLabel,
+    HIndetProgressBarM2,
+    HProgressBar,
 )
 from hytils import red, yellow
 
@@ -141,3 +146,103 @@ class Page(QWidget, metaclass=QWidgetABCMeta):
         """Updated settings from the previous pages
         """
         pass
+
+
+    # Specific to children that have Progress Bar
+    def set_progress_value(self, value: int | str) -> None:
+        self.indicator_progress: HLabel
+        self.indicator_progress_stylesheet: str
+        try:
+            progress_text: str = ""
+            if isinstance(value, int):
+                if value == 100:
+                    progress_text = "✔"
+                    self.indicator_progress.setStyleSheet(
+                        self.indicator_progress_stylesheet +
+                        rf"QLabel{{font-size: 24px; color: green;}}"
+                    )
+                    print(self.indicator_progress.styleSheet())
+                elif value == -1:
+                    progress_text = "❌"
+                    self.indicator_progress.setStyleSheet(
+                        self.indicator_progress_stylesheet +
+                        rf"QLabel{{font-size: 24px; color: red;}}"
+                    )
+
+                else:
+                    progress_text = f"{int(value + 0.5)}%"
+            else:
+                progress_text = value
+            self.indicator_progress.setText(progress_text)
+        except:
+            pass
+
+
+    def slot_update_progress(self, type: Literal['progress', 'indet'], value: int):
+        """Update progress bar and percentage label."""
+        self.progress_bar: HProgressBar
+        self.indet_progress_bar: HIndetProgressBarM2
+        try:
+            # Show/Hide the correct progress bar
+            if type == 'indet':
+                if not self.indet_progress_bar.isVisible():
+                    self.progress_bar.setVisible(False)
+                    self.indet_progress_bar.setVisible(True)
+                    self.indet_progress_bar.start()
+                    self.indicator_progress.setText("")
+
+            else:
+                if not self.progress_bar.isVisible():
+                    self.indet_progress_bar.setVisible(False)
+                    self.progress_bar.setVisible(True)
+
+            # Do not show the % if indeterminate
+            if self.indet_progress_bar.isVisible():
+                self.indicator_progress.setVisible(False)
+            else:
+                self.indicator_progress.setVisible(True)
+
+            duration: int = 0
+            if value == 100:
+                duration = self.progress_bar.getAnimationDuration()
+                self.progress_bar.setAnimationDuration(0)
+                self.indet_progress_bar.stop()
+                self.set_progress_value(100)
+
+            self.progress_bar.setValue(value)
+            self.set_progress_value(value)
+
+            if duration:
+                self.progress_bar.setAnimationDuration(value)
+        except:
+            pass
+
+
+    def slot_on_finished(self, success: bool, files: list[Path]):
+        self.progress_bar: HProgressBar
+        self.indet_progress_bar: HIndetProgressBarM2
+        try:
+            self._installation_started = False
+
+            duration = self.progress_bar.getAnimationDuration()
+            self.progress_bar.setAnimationDuration(0.5)
+            self.indicator_progress.setVisible(True)
+
+            if success:
+                self.progress_bar.setValue(100)
+                self.indet_progress_bar.stop()
+                self.set_progress_value(100)
+
+            else:
+                self.progress_bar.setValue(0)
+                self.indet_progress_bar.stop()
+                self.set_progress_value(-1)
+                self.indicator_progress.setText("❌")
+
+            self.progress_bar.setAnimationDuration(duration)
+
+            self.installed_files = files
+            time.sleep(0.8)
+            self.completed.emit(success)
+        except:
+            pass

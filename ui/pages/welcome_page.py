@@ -1,15 +1,22 @@
 from pprint import pprint
+import shutil
+import os
+
 from typing import Any, Type
 from PySide6.QtCore import (
     Signal,
+    QTimer,
 )
+
 from PySide6.QtGui import (
     QPaintEvent,
 )
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
+    QFileDialog,
 )
+
 from hwidgets import (
     Theme,
 )
@@ -31,9 +38,15 @@ class WelcomePage(Page, Ui_WelcomeWidget):
         self.setupUi(self, theme=theme)
         self._step_label = f"Welcome"
 
+        self.timer_check_space = QTimer(self)
+        self.timer_check_space.timeout.connect(self.calculate_required_disk_space)
+
         self.reset_widgets()
         if self.icon_button_browse.isEnabled():
             self.icon_button_browse.released.connect(self.slot_select_dir)
+
+        self.checkbox_cache.clicked.connect(self.calculate_required_disk_space)
+        self.lineedit_custom_dir.textChanged.connect(self.calculate_required_disk_space)
 
 
     def reset_widgets(self) -> None:
@@ -52,6 +65,7 @@ class WelcomePage(Page, Ui_WelcomeWidget):
         self.checkbox_custom_dir.setEnabled(False)
         self.lineedit_custom_dir.setText("")
         self.lineedit_custom_dir.setEnabled(False)
+        self.lineedit_custom_dir.setReadOnly(True)
         self.icon_button_browse.setEnabled(False)
 
 
@@ -72,6 +86,8 @@ class WelcomePage(Page, Ui_WelcomeWidget):
         if s is not None:
             self.lineedit_custom_dir.setText(s)
 
+        self.calculate_required_disk_space()
+
 
     def get_result(self) -> dict:
         return {
@@ -83,8 +99,50 @@ class WelcomePage(Page, Ui_WelcomeWidget):
 
 
     def slot_select_dir(self):
-        print("select directory")
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Directory",
+            self.lineedit_custom_dir.text() or os.path.expanduser("~"),
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
+        )
+        if directory:
+            self.lineedit_custom_dir.setText(directory)
 
 
+    def calculate_required_disk_space(self) -> None:
+        path = self.lineedit_custom_dir.text()
+        if not path:
+            path = "."
+
+        try:
+            if not os.path.exists(path):
+                # Check parent directory if path doesn't exist
+                parent = os.path.dirname(path)
+                if parent and os.path.exists(parent):
+                    path = parent
+                else:
+                    path = "."
+            
+            total, used, free = shutil.disk_usage(path)
+            free_space = free // (2**30)  # Convert to GB
+        except OSError:
+            free_space = 0
+
+        required_space = 4
+        if self.checkbox_cache.isChecked():
+            required_space += 4
+
+        self.comment_required_disk_space.setText(
+            f"Required space to install this product: {required_space} GB (Available: {free_space}GB)"
+        )
+
+        if free_space < required_space:
+            if not self.timer_check_space.isActive():
+                self.timer_check_space.start(3000)
+            self.completed.emit(False)
+        else:
+            if self.timer_check_space.isActive():
+                self.timer_check_space.stop()
+            self.completed.emit(True)
 
 

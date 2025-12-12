@@ -67,7 +67,7 @@ class Ui_WelcomeWidget(object):
     def setupUi(self, WelcomeWidget, theme: Type[Theme]):
         if not WelcomeWidget.objectName():
             WelcomeWidget.setObjectName(u"WelcomeWidget")
-        WelcomeWidget.resize(695, 337)
+        WelcomeWidget.resize(695, 373)
         self.main_layout = QVBoxLayout(WelcomeWidget)
         self.main_layout.setSpacing(16)
         self.main_layout.setObjectName(u"main_layout")
@@ -165,6 +165,11 @@ class Ui_WelcomeWidget(object):
 
         self.main_layout.addItem(self.verticalSpacer_bottom)
 
+        self.comment_required_disk_space = HComment(WelcomeWidget, theme=theme)
+        self.comment_required_disk_space.setObjectName(u"comment_required_disk_space")
+
+        self.main_layout.addWidget(self.comment_required_disk_space)
+
 
         self.retranslateUi(WelcomeWidget)
 
@@ -182,5 +187,6 @@ class Ui_WelcomeWidget(object):
         self.checkbox_custom_dir.setText(QCoreApplication.translate("WelcomeWidget", u"Custom installation directory (Not available yet)", None))
         self.icon_button_browse.setText(QCoreApplication.translate("WelcomeWidget", u"...", None))
         self.checkbox_use_as_global.setText(QCoreApplication.translate("WelcomeWidget", u"Use the installation settings as the default for all products (save disk space, recommended)", None))
+        self.comment_required_disk_space.setText(QCoreApplication.translate("WelcomeWidget", u"Required space: 7GB", None))
     # retranslateUi
 

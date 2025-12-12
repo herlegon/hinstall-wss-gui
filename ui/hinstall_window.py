@@ -236,9 +236,9 @@ class InstallerWindow(QMainWindow):
         navigation_layout.setContentsMargins(content_hpadding, 4, 24 , 4)
         navigation_layout.setSpacing(16)
 
-        self.info = HComment(parent=self, theme=theme, text = "Requires at least 8GB. (Available: 30GB)")
-        self.info.setWordWrap(False)
-        navigation_layout.addWidget(self.info)
+        # self.info = HComment(parent=self, theme=theme, text = "Requires at least 8GB. (Available: 30GB)")
+        # self.info.setWordWrap(False)
+        # navigation_layout.addWidget(self.info)
         navigation_layout.addStretch()
         navigation_layout.addWidget(self.previous_button)
         navigation_layout.addWidget(self.cancel_button)
@@ -256,7 +256,7 @@ class InstallerWindow(QMainWindow):
         self.log_layout.setSpacing(self.log_spacing)
 
         # Log Buttons
-        self.log_buttons_layout = QHBoxLayout(self.log_container)
+        self.log_buttons_layout = QHBoxLayout()
         self.log_buttons_layout.setSpacing(8)
 
         self.log_button = HFramelessButton(parent=self, text="Show Log", theme=theme)
@@ -441,11 +441,15 @@ class InstallerWindow(QMainWindow):
             # Track files installed by this page
             files = p.get_installed_files()
             self.all_installed_files.extend(files)
-            ilog.debug(f"Page completed. Installed files: {files}")
+            if files:
+                ilog.debug(f"Page completed. Installed files: {files}")
 
             # Enable next button
             self.next_button.setEnabled(True)
-            if p.has_progress_bar():
+            if (
+                p.has_progress_bar()
+                and self.current_index < len(self.pages) - 1
+            ):
                 self.slot_go_next()
 
 
@@ -496,10 +500,6 @@ class InstallerWindow(QMainWindow):
 
         self.step_indicator.setCurrentStep(current)
         self.current_index = current
-        if current == 0:
-            self.info.setVisible(True)
-        else:
-            self.info.setVisible(False)
 
         # Resize window to fit the new page
         # QTimer.singleShot(0, self._resize_to_current_page)

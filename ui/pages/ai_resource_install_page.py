@@ -5,6 +5,7 @@ import time
 from typing import Any, Literal, Type
 from PySide6.QtCore import (
     Signal,
+    Qt,
 )
 from PySide6.QtGui import (
     QPaintEvent,
@@ -12,7 +13,8 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
-    QSizePolicy
+    QSizePolicy,
+    QHBoxLayout,
 )
 from hwidgets import (
     HIndetProgressBarM2,
@@ -52,15 +54,7 @@ class AiResourceInstallPage(Page, Ui_AiResourceInstallWidget):
         super().reset_widgets()
         self.indicator_step.setText("Installing AI Computational Resource...")
         self.indicator_progress.setText("")
-
-        while self.syscap_layout.count():
-            item = self.syscap_layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.setParent(None)
-                widget.deleteLater()
-        self.syscap_layout.invalidate()
-        self.syscap_layout.activate()
+        self.remove_ai_labels()
 
 
     def update_settings(self, settings: dict[str, Any]) -> None:
@@ -92,7 +86,37 @@ class AiResourceInstallPage(Page, Ui_AiResourceInstallWidget):
         self.worker.start()
 
 
+    def remove_ai_labels(self) -> None:
+        while self.syscap_layout.count():
+            item = self.syscap_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+        self.syscap_layout.invalidate()
+        self.syscap_layout.activate()
+
+
     def slot_syscap_updated(self, syscap: dict[str, bool]) -> None:
+        self.remove_ai_labels()
+        bullet: str = "‣"
+
+        def _add_label(text: str) -> None:
+            h_layout = QHBoxLayout()
+            h_layout.setSpacing(0)
+            bullet_label = HLabel(theme=self.theme, text=bullet)
+            bullet_label.setFontSize(22)
+            bullet_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignCenter)
+            bullet_label.setStyleSheet(
+                bullet_label.styleSheet()
+                + "QLabel{margin-bottom: 6px; margin-right: 0px;}"
+            )
+            text_label = HLabel(theme=self.theme, text=text)
+            h_layout.addWidget(bullet_label)
+            h_layout.addWidget(text_label)
+            h_layout.addStretch()
+            self.syscap_layout.addLayout(h_layout)
+
         # Torch
         if syscap.get('cuda', False):
             torch_variant = "CUDA"
@@ -100,84 +124,25 @@ class AiResourceInstallPage(Page, Ui_AiResourceInstallWidget):
             torch_variant = "RocM"
         elif syscap.get('intel', False):
             torch_variant = "XPU"
-        torch_label = HLabel(theme=self.theme, text=f"- PyTorch ({torch_variant})")
-        self.syscap_layout.addWidget(torch_label)
+        else:
+            torch_variant = "CPU"
+        _add_label(f"PyTorch ({torch_variant})")
 
         # TensorRT
         if syscap.get('tensorrt', False):
-            tensorrt_label = HLabel(theme=self.theme, text=f"- NVIDIA TensorRT")
-            self.syscap_layout.addWidget(tensorrt_label)
+            _add_label("NVIDIA TensorRT")
 
         # DirectML
         if syscap.get('directml', False):
-            directml_label = HLabel(theme=self.theme, text=f"- Microsoft Direct ML")
-            self.syscap_layout.addWidget(directml_label)
+            _add_label("Microsoft Direct ML")
+
+        # ONNX runtime
+        _add_label("Microsoft ONNX Runtime")
 
         self.indet_progress_bar.setVisible(False)
         self.progress_bar.setVisible(True)
         self.indicator_step.setText("Installing AI Computational Resource...")
         self.indicator_progress.setVisible(False)
-
-
-
-    def slot_update_progress(self, type: Literal['progress', 'indet'], value: int):
-        """Update progress bar and percentage label."""
-
-        # Show/Hide the correct progress bar
-        if type == 'indet':
-            if not self.indet_progress_bar.isVisible():
-                self.progress_bar.setVisible(False)
-                self.indet_progress_bar.setVisible(True)
-                self.indet_progress_bar.start()
-                self.indicator_progress.setText("")
-
-        else:
-            if not self.progress_bar.isVisible():
-                self.indet_progress_bar.setVisible(False)
-                self.progress_bar.setVisible(True)
-
-        # Do not show the % if indeterminate
-        if self.indet_progress_bar.isVisible():
-            self.indicator_progress.setVisible(False)
-        else:
-            self.indicator_progress.setVisible(True)
-
-        duration: int = 0
-        if value == 100:
-            duration = self.progress_bar.getAnimationDuration()
-            self.progress_bar.setAnimationDuration(0)
-            self.indet_progress_bar.stop()
-
-        self.progress_bar.setValue(value)
-        self.indicator_progress.setText(f"{value}%")
-
-        if duration:
-            self.progress_bar.setAnimationDuration(value)
-
-
-    def slot_on_finished(self, success: bool, files: list[Path]):
-        """Handle completion of installation."""
-        self._installation_started = False
-
-        duration = self.progress_bar.getAnimationDuration()
-        self.progress_bar.setAnimationDuration(0.5)
-        self.indicator_progress.setVisible(True)
-
-        if success:
-            self.progress_bar.setValue(100)
-            self.indet_progress_bar.stop()
-            self.indicator_progress.setText("")
-
-        else:
-            self.progress_bar.setValue(0)
-            self.indet_progress_bar.stop()
-            self.indicator_progress.setText("❌")
-
-        self.progress_bar.setAnimationDuration(duration)
-
-        self.installed_files = files
-        time.sleep(1)
-        self.completed.emit(success)
 
 
     def get_result(self) -> dict:

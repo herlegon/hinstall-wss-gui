@@ -247,7 +247,7 @@ You are responsible for license and patent compliance, including commercial use.
      <item alignment="Qt::AlignmentFlag::AlignTop">
       <widget class="QLabel" name="disclaimer">
        <property name="text">
-        <string>Disclaimer: neither Herlegon nor their developers is responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.</string>
+        <string>Disclaimer: neither Herlegon nor their developers are responsible for the choice of FFmpeg binary. By selecting an external or third-party FFmpeg, you acknowledge that you are responsible for complying with all applicable licenses and patent obligations, including any requirements for commercial use.</string>
        </property>
        <property name="wordWrap">
         <bool>true</bool>

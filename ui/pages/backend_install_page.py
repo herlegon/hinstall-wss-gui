@@ -65,6 +65,7 @@ class BackendInstallPage(Page, Ui_BackendWidget):
         self.progress_layout.addWidget(self.indet_progress_bar)
         self.indet_progress_bar.setVisible(False)
         self.reset_widgets()
+        self.indicator_step_stylesheet = self.indicator_step.styleSheet()
 
 
     def reset_widgets(self) -> None:
@@ -84,6 +85,7 @@ class BackendInstallPage(Page, Ui_BackendWidget):
         self.worker: BackendInstallWorker = BackendInstallWorker(
             settings=self.user_settings,
             app_cfg=self.app_cfg,
+            stages=1,
         )
         self.worker.progress.connect(self.slot_update_progress)
         self.worker.task_name.connect(self.indicator_step.setText)
@@ -93,64 +95,7 @@ class BackendInstallPage(Page, Ui_BackendWidget):
         self.worker.start()
 
 
-    def slot_update_progress(self, type: Literal['progress', 'indet'], value: int):
-        """Update progress bar and percentage label."""
 
-        # Show/Hide the correct progress bar
-        if type == 'indet':
-            if not self.indet_progress_bar.isVisible():
-                self.progress_bar.setVisible(False)
-                self.indet_progress_bar.setVisible(True)
-                self.indet_progress_bar.start()
-                self.indicator_progress.setText("")
-
-        else:
-            if not self.progress_bar.isVisible():
-                self.indet_progress_bar.setVisible(False)
-                self.progress_bar.setVisible(True)
-
-        # Do not show the % if indeterminate
-        if self.indet_progress_bar.isVisible():
-            self.indicator_progress.setVisible(False)
-        else:
-            self.indicator_progress.setVisible(True)
-
-        duration: int = 0
-        if value == 100:
-            duration = self.progress_bar.getAnimationDuration()
-            self.progress_bar.setAnimationDuration(0)
-            self.indet_progress_bar.stop()
-
-        self.progress_bar.setValue(value)
-        self.indicator_progress.setText(f"{value}%")
-
-        if duration:
-            self.progress_bar.setAnimationDuration(value)
-
-
-    def slot_on_finished(self, success: bool, files: list[Path]):
-        """Handle completion of installation."""
-        self._installation_started = False
-
-        duration = self.progress_bar.getAnimationDuration()
-        self.progress_bar.setAnimationDuration(0.5)
-        self.indicator_progress.setVisible(True)
-
-        if success:
-            self.progress_bar.setValue(100)
-            self.indet_progress_bar.stop()
-            self.indicator_progress.setText("")
-
-        else:
-            self.progress_bar.setValue(0)
-            self.indet_progress_bar.stop()
-            self.indicator_progress.setText("❌")
-
-        self.progress_bar.setAnimationDuration(duration)
-
-        self.installed_files = files
-        time.sleep(1)
-        self.completed.emit(success)
 
 
     def get_result(self) -> dict:
