@@ -37,6 +37,7 @@ from hinstall import (
     ilog,
 )
 from hwidgets import (
+    HMessageBox,
     HComment,
     HHorizontalDivider,
     HStrongButton,
@@ -50,9 +51,11 @@ from hwidgets import (
 from PySide6.QtWidgets import QDialog, QLabel
 
 from .user_settings import UserSettings
+from .user_settings import UserSettings
 from .title_bar import TitleBar
 
 from .pages.page import Page
+
 from .pages.welcome_page import WelcomePage
 from .pages.ffmpeg_selection_page import FFmpegSelectionPage
 from .pages.third_parties_install_page import ThirdPartiesInstallPage
@@ -86,6 +89,7 @@ class InstallerWindow(QMainWindow):
         self.dev: bool = True
 
         theme = StyleManager().get_theme()
+        self.theme = theme
 
         config_fp = (Path(__file__).parent.parent / "tests" / "configs" / f"{tool}.toml").resolve()
 
@@ -526,20 +530,19 @@ class InstallerWindow(QMainWindow):
 
     def slot_cancel(self):
         """Handle cancel button click with confirmation."""
-        from PySide6.QtWidgets import QMessageBox
 
         # Show confirmation dialog
-        theme = self.theme if hasattr(self, 'theme') else StyleManager().get_theme()
-        msg_box = QMessageBox(self)
+        msg_box = HMessageBox(self, theme=self.theme)
         msg_box.setWindowTitle("Cancel Installation")
         msg_box.setText("Are you sure you want to cancel the installation?")
         msg_box.setInformativeText("This will stop the current process and remove all installed files.")
-        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        msg_box.setDefaultButton(QMessageBox.No)
+        msg_box.setStandardButtons(HMessageBox.Yes | HMessageBox.No)
+        msg_box.setDefaultButton(HMessageBox.No)
 
         result = msg_box.exec()
 
-        if result == QMessageBox.Yes:
+        if result == HMessageBox.Yes:
+
             # Cancel any running workers
             current_page = self.pages[self.current_index]
             current_page.cancel_worker()

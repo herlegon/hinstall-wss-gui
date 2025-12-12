@@ -18,16 +18,18 @@ from PySide6.QtWidgets import (
     QWidget,
     QSizePolicy,
     QFileDialog,
-    QMessageBox,
 )
+
 
 
 from hwidgets import (
     Theme,
+    HMessageBox,
 )
 from hytils import red
 from ..designer.ui_ffmpeg_selection_widget import Ui_FFmpegSelectionWidget
 from .page import Page
+
 
 from hwidgets.debug import *
 
@@ -118,7 +120,7 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
         self.line_edit_ffmpeg_dir.setText("")
         self.line_edit_ffmpeg_dir.setEnabled(False)
         self.line_edit_ffmpeg_dir.setReadOnly(True)
-        self.outlined_button_browse.setEnabled(False)
+        self.outlined_button_browse.setEnabled(True)
 
 
     def update_settings(self, settings: dict[str, Any]) -> None:
@@ -175,6 +177,10 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
 
         # Optionally, you can also call adjustSize to make sure the widget resizes to fit its content
     def slot_select_ffmpeg(self):
+        self.radio_button_user.blockSignals(True)
+        self.radio_button_user.setChecked(True)
+        self.radio_button_user.blockSignals(False)
+
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select FFmpeg Executable",
@@ -189,10 +195,11 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
         if self.validate_ffmpeg_dir(parent_dir):
             self.line_edit_ffmpeg_dir.setText(str(file_path))
         else:
-            QMessageBox.critical(
+            HMessageBox.critical(
                 self,
                 "Invalid FFmpeg/FFprobe",
-                "FFmpeg and FFprobe must be in the same directory and be valid executables."
+                "FFmpeg and FFprobe must be in the same directory and be valid executables.",
+                theme=self.theme,
             )
 
 
@@ -240,7 +247,7 @@ class FFmpegSelectionPage(Page, Ui_FFmpegSelectionWidget):
         is_user_defined = self.radio_button_user.isChecked()
 
         self.line_edit_ffmpeg_dir.setEnabled(is_user_defined)
-        self.outlined_button_browse.setEnabled(is_user_defined)
+        # self.outlined_button_browse.setEnabled(is_user_defined)
 
         if is_user_defined:
             self.validate_ffmpeg_dir(self.line_edit_ffmpeg_dir.text())
