@@ -26,10 +26,10 @@ def download_package_(
 
     # Dowanload an install
     package.installed = False
-
     is_cached = package.is_cached()
 
     # Use local host to simulate a download
+    package.downloaded = False
     if (
         not is_cached
         and package.use_local_rehost
@@ -38,8 +38,8 @@ def download_package_(
         package.download_from_local_rehost()
 
     # Finally download it from host
-    if not package.downloaded and package.downloadable:
-        package.download_from_host(task_name)
+    if not package.downloaded:
+        package.download_from_host()
 
     return package
 

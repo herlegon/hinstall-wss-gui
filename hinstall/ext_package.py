@@ -1,6 +1,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+import os
 from pprint import pprint
 import tempfile
 from hytils import get_extension, reformat_datetime
@@ -27,15 +28,16 @@ class ExtPackage:
     name: str
     filename: str
     key: str
+    variant: str = ""
 
     # Installation, skip is not necessary except for dev and to keep the
     # definitions in the config file
-    skip: bool
+    skip: bool = False
     install_dir: Path = None
     installed: bool = False
 
     # Where to download from
-    tag: Path = None
+    tag: str = ""
     size: int = 0
     host: str = ''
 
@@ -43,7 +45,6 @@ class ExtPackage:
     response: requests.Response | None = None
 
     # Downloaded/cached
-    downloadable: bool = False
     downloaded: bool = False
     cache_file: Path = None
     do_cache: bool = False
@@ -87,72 +88,20 @@ class ExtPackage:
 
 
     def update_tag(self) -> None:
-        last_modified: str = ""
-        self.downloadable: bool = False
-        self._update_cache_file()
+        ilog.debug(f"update_tag for {self.name}")
 
-        if self.use_local_rehost:
-            local_rehost = g_backend_dirs.local_rehost
-            if local_rehost and local_rehost.is_dir():
-                # Use local rehost for testing purpose
-                local_rehost_fp: Path = local_rehost / self.filename
-                if local_rehost_fp.is_file():
-                    dt = datetime.fromtimestamp(local_rehost_fp.stat().st_mtime)
-                    formatted_time = dt.strftime("%Y-%m-%dT%H-%M-%S")
-                    last_modified = formatted_time
-                    ilog.debug(f"use local rehost: {self.name}, {last_modified}")
-                    self.size = local_rehost_fp.stat().st_size
-                    self.downloadable = True
-                else:
-                    ilog.warning(f"Asked to use local host, but file {local_rehost_fp} not found")
-            else:
-                ilog.warning(f"Asked to use local host ({local_rehost}) but directory doesn't exist")
-
-        else:
-            # Get info from host and update package info
-            url: str = f"{self.host}/{self.filename}"
-            ilog.debug(f"url: {url}")
-
-            reacheable = check_site_reachable(get_domain_from_url(url))
-            if reacheable:
-                for attempt in range(self.retry_count):
-                    response: requests.Response
-                    try:
-                        response = requests.get(url, stream=True)
-                        response.raise_for_status()
-
-                    except (URLError, requests.HTTPError):
-                        ilog.warning(f"Host not reachable")
-                        if attempt < self.retry_count - 1:
-                            continue
-
-                    except requests.exceptions.RequestException as e:
-                        if str(e).startswith('404'):
-                            ilog.error(f"{self.filename} not found on the host")
-                            response = None
-                            break
-                        else:
-                            ilog.error(f"Exception while fetching: {str(e)}")
-                        if attempt < self.retry_count - 1:
-                            continue
-
-                    if response:
-                        self.downloadable = True
-                        last_modified: str = reformat_datetime(response.headers['Last-Modified'])
-                        self.size = int(response.headers.get('Content-length', 0))
-                    self.response = response
-
+        fp: Path = Path(self.filename)
         self.tag = (
-            f"{self.filename}_{last_modified}"
-            if last_modified
-            else ""
+            Path(fp.stem).stem
+            if fp.suffix in (".gz", ".bz", ".xz")
+            and fp.stem.endswith(".tar")
+            else fp.stem
         )
 
 
     def is_up_to_date(self) -> bool | None:
-        self.update_tag()
-
         if not self.install_dir.is_dir():
+            ilog.debug(f"{self.install_dir} doesn't exist")
             self.installed = False
             return False
 
@@ -209,6 +158,8 @@ class ExtPackage:
             self.downloaded = True
             ilog.debug(f"{self.name} installer cached")
             return True
+        else:
+            ilog.debug(f"{self.name} installer is not cached yet")
 
         return False
 
@@ -217,7 +168,7 @@ class ExtPackage:
     def clean_cache(self) -> None:
         # clean cache of other version
         self._update_cache_file()
-        ilog.debug(f"Remove old cache: {self.cache_file}")
+        ilog.debug(f"Clean cache")
         if self.cache_file is None:
             return
         for file in self.cache_file.parent.iterdir():
@@ -257,7 +208,7 @@ class ExtPackage:
             self.downloaded = True
 
         else:
-            ilog.error(f"File is missing")
+            ilog.error(f"File is missing: {local_fp}")
             self.downloaded = False
 
         if self.downloaded:
@@ -269,7 +220,6 @@ class ExtPackage:
 
 
     def download_from_host(self) -> bool:
-
         if not self.tag:
             ilog.error(f"Tag file not valid for package: {self.name}")
             ilog.status(f"[ce]{self.name}: tag is not valid.")
@@ -287,18 +237,30 @@ class ExtPackage:
 
         ilog.debug(f"Download package: {self.filename} to {tmp_dir}")
 
+        host = self.host[:-1] if self.host.endswith("/") else self.host
+        url = f"{host}/{self.filename}"
+        ilog.debug(f"url: {url}")
+
         _retry: int = self.retry_count
         while _retry:
             ilog.status(f"[sd]{self.name}")
             ilog.status(f"[pg]0.")
 
+            response = requests.get(
+                url,
+                stream=True,
+                timeout=10,
+                allow_redirects=True
+            )
+            response.raise_for_status()
+
             with open(self.cache_file, "wb") as f:
-                try:
-                    self.response.raw.decode_content = True
+                # try:
+                    response.raw.decode_content = True
 
                     # Update every 512KB
                     wrapper = ProgressWrapper(
-                        self.response.raw,
+                        response.raw,
                         total_size=self.size,
                         update_threshold=512*1024,
                     )
@@ -308,9 +270,9 @@ class ExtPackage:
                     # Update any remaining bytes
                     wrapper.flush_progress()
 
-                except Exception as e:
-                    ilog.debug(f"[W] Retry to download. Reason: {type(e)}")
-                    _retry -= 1
+                # except Exception as e:
+                #     ilog.debug(f"[W] Retry to download. Reason: {type(e)}")
+                #     _retry -= 1
 
             if _retry == 0:
                 ilog.debug(f"[E] failed to download {self.filename}")

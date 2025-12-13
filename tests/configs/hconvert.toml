@@ -15,9 +15,15 @@ filename = "python-3.12.10-win-x86_64.tar.gz"
 do_cache = true
 
 [packages.win32.ffmpeg]
-host = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-11-17-12-57/"
-filename = "ffmpeg-N-121789-gddf443f1e9-win64-lgpl.zip"
+host = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-12-12-12-56/"
 do_cache = true
+
+[packages.win32.ffmpeg.lgpl]
+filename = "ffmpeg-n8.0.1-28-g9c93070155-win64-lgpl-8.0.zip"
+
+[packages.win32.ffmpeg.gpl]
+filename = "ffmpeg-n8.0.1-28-g9c93070155-win64-gpl-8.0.zip"
+
 
 [packages.win32.vspython]
 filename = "vspython.zip"
@@ -31,9 +37,14 @@ filename = "python-3.12.12-linux-x86_64.tar.gz"
 do_cache = true
 
 [packages.linux.ffmpeg]
-host = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-11-17-12-57/"
-filename = "ffmpeg-N-121789-gddf443f1e9-linux64-lgpl.tar.xz"
+host = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-12-12-12-56/"
 do_cache = true
+
+[packages.linux.ffmpeg.lgpl]
+filename = "ffmpeg-n8.0.1-28-g9c93070155-linux64-lgpl-8.0.tar.xz"
+
+[packages.linux.ffmpeg.gpl]
+filename = "ffmpeg-n8.0.1-28-g9c93070155-linux64-gpl-8.0.tar.xz"
 
 
 # Python packages
