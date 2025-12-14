@@ -7,7 +7,6 @@ from .logger import ilog
 
 def download_package_(
     package: ExtPackage,
-    task_name: str = "",
     reinstall: bool = False,
 ) -> ExtPackage:
 

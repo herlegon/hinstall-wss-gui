@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 import os
 import sys
 import shutil
@@ -38,13 +39,15 @@ def create_tar_gz_archive(src_dir, tar_gz_file):
 def main():
     PY_VERSION = "3.12.10"
     src_archive: str = f"python-{PY_VERSION}-embed-amd64.zip"
-    release_archive = f"python-{PY_VERSION}-win-x86_64.tar.gz"
+    timestamp: str = datetime.now().strftime("%Y%m%dT%Hh%M")
+    release_archive = f"python-{PY_VERSION}-win-x86_64-{timestamp}.tar.gz"
     req_packages = [
         "requests",
         "websockets",
         "setuptools",
         # "wheel",
-        ("hytils", 'local'),
+        # ("hytils", 'local'),
+        "hytils",
     ]
 
     local_rehost_dir = (Path(__file__).parent.parent.parent / "herlegon" / "rehost").resolve()

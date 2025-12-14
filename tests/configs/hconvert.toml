@@ -1,7 +1,7 @@
 # Packages
 #===========================================================
 [packages]
-host = "https://github.com/JepEtau/external_rehost/releases/download/external"
+host = "https://github.com/herlegon/rehost/releases/download/external"
 do_cache = false
 
 

@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 from pprint import pprint
 import tempfile
-from hytils import get_extension, reformat_datetime
+from hytils import get_extension
 from pathlib import Path
 import re
 import shutil
