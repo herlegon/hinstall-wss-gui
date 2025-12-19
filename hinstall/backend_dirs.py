@@ -2,8 +2,9 @@ from dataclasses import dataclass
 import sys
 import os
 from pathlib import Path
+from logger import ilog
 
-
+ORGANIZATION: str = "herlegon"
 
 @dataclass(slots=True)
 class BackendDirectories:
@@ -18,7 +19,7 @@ class BackendDirectories:
 
 def get_backend_dirs(
     app_name: str = "hconvert",
-    organization: str = "herlegon"
+    organization: str = ORGANIZATION
 ) -> BackendDirectories:
     """Get platform-specific backend directory"""
 
@@ -57,7 +58,7 @@ g_backend_dirs: BackendDirectories = get_backend_dirs()
 
 
 
-def get_local_dev_dir() -> Path:
+def get_local_dev_dir(organization: str = ORGANIZATION) -> Path:
     local_dev_dir: Path
 
     if sys.platform == "win32":
