@@ -49,7 +49,7 @@ class CommandState(Enum):
 
 
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent / "hwss"))
-from api import (
+from hwss.api import (
     RequestMessage,
     deserialize,
     serialize,

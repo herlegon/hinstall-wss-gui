@@ -24,8 +24,7 @@ from .backend_dirs import g_backend_dirs, get_local_dev_dir
 from .py_packages_install import (
     generate_backend_env,
 )
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "hwss"))
-from api import InstallProgress
+from hwss.api import InstallProgress
 
 @dataclass
 class PyPackage:

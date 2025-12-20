@@ -31,9 +31,7 @@ class CommandState(Enum):
     END = 'end'
     ERROR = 'error'
 
-
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "hwss"))
-from api import (
+from hwss.api import (
     RequestMessage,
     deserialize,
     serialize,

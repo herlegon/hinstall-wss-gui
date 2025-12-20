@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import sys
 import os
 from pathlib import Path
-from logger import ilog
+from .logger import ilog
 
 ORGANIZATION: str = "herlegon"
 
